@@ -15,7 +15,7 @@ members = [
 version = "0.80.0"
 
 [workspace.dependencies]
-c2pa = { path = "sdk", default-features = false }
+c2pa = { package = "c2pa-rs-text-support", path = "sdk", default-features = false }
 
 [profile.dev]
 opt-level = 1          # allows test code to run faster at a small compile time cost

@@ -493,7 +493,22 @@ dependencies = [
 ]
 
 [[package]]
-name = "c2pa"
+name = "c2pa-c-ffi"
+version = "0.80.0"
+dependencies = [
+ "c2pa-rs-text-support",
+ "cbindgen",
+ "libc",
+ "scopeguard",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.18",
+ "tokio",
+]
+
+[[package]]
+name = "c2pa-rs-text-support"
 version = "0.80.0"
 dependencies = [
  "anyhow",
@@ -598,21 +613,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "c2pa-c-ffi"
-version = "0.80.0"
-dependencies = [
- "c2pa",
- "cbindgen",
- "libc",
- "scopeguard",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror 2.0.18",
- "tokio",
-]
-
-[[package]]
 name = "c2pa_cbor"
 version = "0.77.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -638,7 +638,7 @@ dependencies = [
  "anyhow",
  "assert_cmd",
  "atree",
- "c2pa",
+ "c2pa-rs-text-support",
  "clap",
  "env_logger",
  "etcetera",
@@ -1388,7 +1388,7 @@ name = "export_schema"
 version = "0.80.0"
 dependencies = [
  "anyhow",
- "c2pa",
+ "c2pa-rs-text-support",
  "schemars 1.2.1",
  "serde_json",
 ]
@@ -2504,7 +2504,7 @@ name = "make_test_images"
 version = "0.80.0"
 dependencies = [
  "anyhow",
- "c2pa",
+ "c2pa-rs-text-support",
  "env_logger",
  "image",
  "lazy_static",

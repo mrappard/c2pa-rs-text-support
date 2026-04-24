@@ -1,5 +1,5 @@
 [package]
-name = "c2pa"
+name = "c2pa-rs-text-support"
 
 version.workspace = true
 

@@ -28,7 +28,7 @@ networking = [
 [dependencies]
 anyhow = "1.0"
 atree = "=0.5.2"
-c2pa = { path = "../sdk", version = "0.80.0", features = [
+c2pa = {package = "c2pa-rs-text-support", path = "../sdk", version = "0.80.0", features = [
     "fetch_remote_manifests",
     "file_io",
     "add_thumbnails",
