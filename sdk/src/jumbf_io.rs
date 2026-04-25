@@ -157,6 +157,28 @@ pub fn save_jumbf_to_memory(asset_type: &str, data: &[u8], store_bytes: &[u8]) -
     Ok(output_stream.into_inner())
 }
 
+/// removes the C2PA JUMBF from an asset stream and writes the cleaned asset to the output stream
+pub fn remove_jumbf_from_stream(
+    asset_type: &str,
+    input_stream: &mut dyn CAIRead,
+    output_stream: &mut dyn CAIReadWrite,
+) -> Result<()> {
+    match get_caiwriter_handler(asset_type) {
+        Some(asset_handler) => asset_handler.remove_cai_store_from_stream(input_stream, output_stream),
+        None => Err(Error::UnsupportedType),
+    }
+}
+
+/// removes the C2PA JUMBF from in-memory asset bytes and returns the cleaned asset bytes
+pub fn remove_jumbf_from_memory(asset_type: &str, data: &[u8]) -> Result<Vec<u8>> {
+    let mut input_stream = Cursor::new(data);
+    let output_vec: Vec<u8> = Vec::with_capacity(data.len());
+    let mut output_stream = Cursor::new(output_vec);
+
+    remove_jumbf_from_stream(asset_type, &mut input_stream, &mut output_stream)?;
+    Ok(output_stream.into_inner())
+}
+
 #[cfg(feature = "file_io")]
 pub(crate) fn get_assetio_handler_from_path(asset_path: &Path) -> Option<&dyn AssetIO> {
     let ext = get_file_extension(asset_path)?;

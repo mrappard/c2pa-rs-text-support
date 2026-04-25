@@ -215,7 +215,13 @@ pub struct ManifestDefinition {
 }
 
 fn default_instance_id() -> String {
-    format!("xmp:iid:{}", Uuid::new_v4())
+    String::new()
+}
+
+fn ensure_instance_id(id: &mut String) {
+    if id.is_empty() {
+        *id = format!("xmp:iid:{}", Uuid::new_v4());
+    }
 }
 
 fn default_claim_generator_info() -> Vec<ClaimGeneratorInfo> {
@@ -2095,7 +2101,7 @@ impl Builder {
             self.add_assertion(labels::DATA_HASH, &ph)?;
         }
         self.definition.format = format.to_string();
-        self.definition.instance_id = format!("xmp:iid:{}", Uuid::new_v4());
+        ensure_instance_id(&mut self.definition.instance_id);
         let mut store = self.to_store()?;
         let placeholder = store.get_data_hashed_manifest_placeholder(reserve_size, format)?;
         Ok(placeholder)
@@ -2850,7 +2856,7 @@ impl Builder {
         signer: &dyn Signer,
         format: &str,
     ) -> Result<Vec<u8>> {
-        self.definition.instance_id = format!("xmp:iid:{}", Uuid::new_v4());
+        ensure_instance_id(&mut self.definition.instance_id);
 
         let mut store = self.to_store()?;
         let bytes = if _sync {
@@ -2896,7 +2902,7 @@ impl Builder {
         let format = format_to_mime(format);
         self.definition.format.clone_from(&format);
         // todo:: read instance_id from xmp from stream ?
-        self.definition.instance_id = format!("xmp:iid:{}", Uuid::new_v4());
+        ensure_instance_id(&mut self.definition.instance_id);
 
         #[cfg(feature = "file_io")]
         #[allow(deprecated)]
@@ -2996,7 +3002,7 @@ impl Builder {
         let format = format_to_mime(format);
         self.definition.format.clone_from(&format);
         // todo:: read instance_id from xmp from stream ?
-        self.definition.instance_id = format!("xmp:iid:{}", Uuid::new_v4());
+        ensure_instance_id(&mut self.definition.instance_id);
 
         #[cfg(feature = "file_io")]
         #[allow(deprecated)]
@@ -3040,7 +3046,7 @@ impl Builder {
 
         self.definition.format =
             crate::format_from_path(path).ok_or(crate::Error::UnsupportedType)?;
-        self.definition.instance_id = format!("xmp:iid:{}", Uuid::new_v4());
+        ensure_instance_id(&mut self.definition.instance_id);
         if self.definition.title.is_none() {
             if let Some(title) = path.file_name() {
                 self.definition.title = Some(title.to_string_lossy().to_string());
