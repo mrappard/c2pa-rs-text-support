@@ -234,10 +234,6 @@ impl C2paPdf for Pdf {
     }
 
     fn remove_manifest_bytes(&mut self) -> Result<(), Error> {
-        if !self.has_c2pa_manifest() {
-            return Err(Error::NoManifest);
-        }
-
         // Find the File Spec, which contains the reference to the manifest.
         let file_spec_ref = self.c2pa_file_spec_object_id().ok_or(Error::NoManifest)?;
 

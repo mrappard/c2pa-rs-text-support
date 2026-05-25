@@ -11,6 +11,7 @@
 // specific language governing permissions and limitations under
 // each license.
 
+#[cfg(not(target_arch = "wasm32"))]
 use rand_chacha::rand_core::{RngCore, SeedableRng};
 
 /// The SaltGenerator trait always the caller to supply
