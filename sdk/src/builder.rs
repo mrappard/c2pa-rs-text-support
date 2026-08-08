@@ -190,10 +190,30 @@ pub struct ManifestDefinition {
     /// Named `hash_alg` (rather than `alg`) to avoid collision with the signer's
     /// signature algorithm, which uses the same key in some combined JSON configurations.
     pub hash_alg: Option<String>,
+
+    /// Optional fixed salt used when hashing the assertions added from this manifest
+    /// definition.
+    ///
+    /// When provided, all user-supplied assertions in `assertions` are salted with
+    /// these bytes, making their `HashedUri` hashes deterministic across independent
+    /// signing calls that use the same inputs.
+    ///
+    /// Provide an empty array (`[]`) to explicitly disable salting on platforms where
+    /// it would otherwise be enabled by default.  Omitting the field entirely uses the
+    /// platform default: no salt on WASM (required for `finalize_identity_assertion`
+    /// determinism), and a fresh random salt on other platforms.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub assertion_salt: Option<Vec<u8>>,
 }
 
 fn default_instance_id() -> String {
-    format!("xmp:iid:{}", Uuid::new_v4())
+    String::new()
+}
+
+fn ensure_instance_id(id: &mut String) {
+    if id.is_empty() {
+        *id = format!("xmp:iid:{}", Uuid::new_v4());
+    }
 }
 
 fn default_format() -> String {
@@ -1605,17 +1625,22 @@ impl Builder {
 
     // Convert a Manifest into a Claim
     fn to_claim(&self) -> Result<Claim> {
+        use crate::salt::DefaultSalt;
+
+        // Build the salt generator from the manifest definition.
+        let salt_gen: DefaultSalt = match &self.definition.assertion_salt {
+            Some(bytes) => DefaultSalt::with_salt(bytes.clone()),
+            None => DefaultSalt::default(),
+        };
+
         // utility function to add created or gathered assertions
         fn add_assertion(
             claim: &mut Claim,
             assertion: &impl AssertionBase,
             created: bool,
+            salt: &DefaultSalt,
         ) -> Result<HashedUri> {
-            if created {
-                claim.add_created_assertion(assertion)
-            } else {
-                claim.add_assertion(assertion)
-            }
+            claim.add_assertion_impl(assertion, salt, created)
         }
 
         let definition = &self.definition;
@@ -1723,7 +1748,7 @@ impl Builder {
                     .into()
                 };
                 // todo: add setting for created added thumbnails
-                add_assertion(&mut claim, &thumbnail, false)?;
+                add_assertion(&mut claim, &thumbnail, false, &salt_gen)?;
             }
         }
         // add all ingredients to the claim
@@ -1856,7 +1881,7 @@ impl Builder {
                     )?;
                     allow_inception = false;
 
-                    add_assertion(&mut claim, &actions, manifest_assertion.created())
+                    add_assertion(&mut claim, &actions, manifest_assertion.created(), &salt_gen)
                 }
                 #[allow(deprecated)]
                 CreativeWork::LABEL => {
@@ -1866,7 +1891,7 @@ impl Builder {
                 #[allow(deprecated)]
                 Exif::LABEL => {
                     let exif: Exif = manifest_assertion.to_assertion()?;
-                    add_assertion(&mut claim, &exif, manifest_assertion.created())
+                    add_assertion(&mut claim, &exif, manifest_assertion.created(), &salt_gen)
                 }
                 BoxHash::LABEL => {
                     let box_hash: BoxHash = manifest_assertion.to_assertion()?;
@@ -1884,18 +1909,20 @@ impl Builder {
                 Metadata::LABEL => {
                     // user metadata will go through the fallback path
                     let metadata: Metadata = manifest_assertion.to_assertion()?;
-                    add_assertion(&mut claim, &metadata, manifest_assertion.created())
+                    add_assertion(&mut claim, &metadata, manifest_assertion.created(), &salt_gen)
                 }
                 _ => match &manifest_assertion.data {
                     AssertionData::Json(value) => add_assertion(
                         &mut claim,
                         &User::new(manifest_assertion.label(), &serde_json::to_string(&value)?),
                         manifest_assertion.created(),
+                        &salt_gen,
                     ),
                     AssertionData::Cbor(value) => add_assertion(
                         &mut claim,
                         &UserCbor::new(manifest_assertion.label(), c2pa_cbor::to_vec(value)?),
                         manifest_assertion.created(),
+                        &salt_gen,
                     ),
                 },
             }?;
@@ -1907,7 +1934,7 @@ impl Builder {
 
             if !actions.actions().is_empty() {
                 // todo: add setting for created added actions
-                add_assertion(&mut claim, &actions, false)?;
+                add_assertion(&mut claim, &actions, false, &salt_gen)?;
             }
         }
 
@@ -2379,7 +2406,7 @@ impl Builder {
             self.add_assertion(labels::DATA_HASH, &ph)?;
         }
         self.definition.format = format.to_string();
-        self.definition.instance_id = format!("xmp:iid:{}", Uuid::new_v4());
+        ensure_instance_id(&mut self.definition.instance_id);
         let mut store = self.to_store()?;
         let placeholder = store.get_data_hashed_manifest_placeholder(reserve_size, format)?;
         Ok(placeholder)
@@ -3134,7 +3161,7 @@ impl Builder {
         signer: &dyn Signer,
         format: &str,
     ) -> Result<Vec<u8>> {
-        self.definition.instance_id = format!("xmp:iid:{}", Uuid::new_v4());
+        ensure_instance_id(&mut self.definition.instance_id);
 
         let mut store = self.to_store()?;
         let bytes = if _sync {
@@ -3316,7 +3343,7 @@ impl Builder {
 
         self.definition.format =
             crate::format_from_path(path).ok_or(crate::Error::UnsupportedType)?;
-        self.definition.instance_id = format!("xmp:iid:{}", Uuid::new_v4());
+        ensure_instance_id(&mut self.definition.instance_id);
         if self.definition.title.is_none() {
             if let Some(title) = path.file_name() {
                 self.definition.title = Some(title.to_string_lossy().to_string());

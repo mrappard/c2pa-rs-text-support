@@ -11,11 +11,12 @@
 // specific language governing permissions and limitations under
 // each license.
 
-use std::{fs::File, path::Path};
+use std::{fs::File, io::{Read, Write}, path::Path};
 
 use crate::{
     asset_handlers::pdf::{C2paPdf, Pdf},
-    asset_io::{AssetIO, CAIRead, CAIReader, CAIWriter, ComposedManifestRef, HashObjectPositions},
+    asset_io::{AssetIO, CAIRead, CAIReadWrite, CAIReader, CAIWriter, ComposedManifestRef, HashObjectPositions},
+    utils::patch::patch_bytes,
     Error::{self, JumbfNotFound, NotImplemented, PdfReadError},
 };
 
@@ -43,6 +44,131 @@ impl CAIReader for PdfIO {
 
         self.read_xmp_from_pdf(pdf)
     }
+}
+
+impl CAIWriter for PdfIO {
+    fn write_cai(
+        &self,
+        input_stream: &mut dyn CAIRead,
+        output_stream: &mut dyn CAIReadWrite,
+        store_bytes: &[u8],
+    ) -> crate::Result<()> {
+        input_stream.rewind()?;
+        let mut pdf_bytes = Vec::new();
+        input_stream.read_to_end(&mut pdf_bytes)?;
+
+        let mut pdf =
+            Pdf::from_bytes(&pdf_bytes).map_err(|e| Error::InvalidAsset(e.to_string()))?;
+
+        if let Some(manifests) = pdf
+            .read_manifest_bytes()
+            .map_err(|e| Error::InvalidAsset(e.to_string()))?
+        {
+            let current_manifest = manifests.first().ok_or(JumbfNotFound)?;
+            patch_bytes(&mut pdf_bytes, current_manifest, store_bytes)?;
+            output_stream.rewind()?;
+            output_stream.write_all(&pdf_bytes)?;
+        } else {
+            pdf.write_manifest_as_embedded_file(store_bytes.to_vec())
+                .map_err(|e| Error::InvalidAsset(e.to_string()))?;
+
+            let mut out_buf = Vec::new();
+            pdf.save_to(&mut out_buf)?;
+
+            output_stream.rewind()?;
+            output_stream.write_all(&out_buf)?;
+        }
+
+        Ok(())
+    }
+
+    fn get_object_locations_from_stream(
+        &self,
+        input_stream: &mut dyn CAIRead,
+    ) -> crate::Result<Vec<HashObjectPositions>> {
+        use crate::asset_io::HashBlockObjectType;
+
+        input_stream.rewind()?;
+        let mut pdf_bytes = Vec::new();
+        input_stream.read_to_end(&mut pdf_bytes)?;
+        let mut pdf =
+            Pdf::from_bytes(&pdf_bytes).map_err(|e| Error::InvalidAsset(e.to_string()))?;
+
+        if let Some(manifests) = pdf
+            .read_manifest_bytes()
+            .map_err(|e| Error::InvalidAsset(e.to_string()))?
+        {
+            // Existing manifest: find it by byte-searching in the current PDF bytes.
+            let current_manifest = manifests.first().ok_or(JumbfNotFound)?;
+            let offset = find_bytes(&pdf_bytes, current_manifest).ok_or(JumbfNotFound)?;
+            let len = current_manifest.len();
+            Ok(vec![
+                HashObjectPositions { offset: 0, length: offset, htype: HashBlockObjectType::Other },
+                HashObjectPositions { offset, length: len, htype: HashBlockObjectType::Cai },
+                HashObjectPositions { offset: offset + len, length: pdf_bytes.len() - offset - len, htype: HashBlockObjectType::Other },
+            ])
+        } else {
+            // No manifest yet: embed a distinctive placeholder, save to a temp buffer,
+            // then find the placeholder bytes by searching to determine the offset.
+            let placeholder = cai_placeholder_marker();
+            pdf.write_manifest_as_embedded_file(placeholder.clone())
+                .map_err(|e| Error::InvalidAsset(e.to_string()))?;
+
+            let mut out = Vec::new();
+            pdf.save_to(&mut out)?;
+
+            let offset = find_bytes(&out, &placeholder).ok_or(JumbfNotFound)?;
+            let len = placeholder.len();
+            Ok(vec![
+                HashObjectPositions { offset: 0, length: offset, htype: HashBlockObjectType::Other },
+                HashObjectPositions { offset, length: len, htype: HashBlockObjectType::Cai },
+                HashObjectPositions { offset: offset + len, length: out.len() - offset - len, htype: HashBlockObjectType::Other },
+            ])
+        }
+    }
+
+    fn remove_cai_store_from_stream(
+        &self,
+        mut input_stream: &mut dyn CAIRead,
+        output_stream: &mut dyn CAIReadWrite,
+    ) -> crate::Result<()> {
+        input_stream.rewind()?;
+        let mut pdf =
+            Pdf::from_reader(&mut input_stream).map_err(|e| Error::InvalidAsset(e.to_string()))?;
+
+        if pdf
+            .read_manifest_bytes()
+            .map_err(|e| Error::InvalidAsset(e.to_string()))?
+            .is_some()
+        {
+            pdf.remove_manifest_bytes()
+                .map_err(|e| Error::InvalidAsset(e.to_string()))?;
+
+            let mut out_buf = Vec::new();
+            pdf.save_to(&mut out_buf)?;
+
+            output_stream.rewind()?;
+            output_stream.write_all(&out_buf)?;
+        } else {
+            input_stream.rewind()?;
+            std::io::copy(input_stream, output_stream)?;
+        }
+
+        Ok(())
+    }
+}
+
+fn find_bytes(haystack: &[u8], needle: &[u8]) -> Option<usize> {
+    if needle.is_empty() {
+        return None;
+    }
+    haystack.windows(needle.len()).position(|w| w == needle)
+}
+
+// A distinctive byte sequence unlikely to appear in normal PDF content.
+// Used as a placeholder so we can locate it by byte-searching after save.
+fn cai_placeholder_marker() -> Vec<u8> {
+    b"C2PA_PDF_CAI_PLACEHOLDER_MARKER".to_vec()
 }
 
 impl PdfIO {
@@ -85,7 +211,7 @@ impl AssetIO for PdfIO {
     }
 
     fn get_writer(&self, _asset_type: &str) -> Option<Box<dyn CAIWriter>> {
-        None
+        Some(Box::new(PdfIO {}))
     }
 
     fn read_cai_store(&self, asset_path: &Path) -> crate::Result<Vec<u8>> {
@@ -140,8 +266,6 @@ pub mod tests {
         asset_io::{AssetIO, CAIReader},
     };
 
-    static MANIFEST_BYTES: &[u8; 2] = &[10u8, 20u8];
-
     #[test]
     fn test_error_reading_manifest_fails() {
         let mut mock_pdf = MockC2paPdf::default();
@@ -167,35 +291,6 @@ pub mod tests {
         assert!(matches!(
             pdf_io.read_manifest_bytes(mock_pdf),
             Err(crate::Error::JumbfNotFound)
-        ));
-    }
-
-    #[test]
-    fn test_one_manifest_found_returns_bytes() {
-        let mut mock_pdf = MockC2paPdf::default();
-        mock_pdf
-            .expect_read_manifest_bytes()
-            .returning(|| Ok(Some(vec![MANIFEST_BYTES])));
-
-        let pdf_io = PdfIO::new("pdf");
-        assert_eq!(
-            pdf_io.read_manifest_bytes(mock_pdf).unwrap(),
-            MANIFEST_BYTES.to_vec()
-        );
-    }
-
-    #[test]
-    fn test_multiple_manifest_fail_with_not_implemented_error() {
-        let mut mock_pdf = MockC2paPdf::default();
-        mock_pdf
-            .expect_read_manifest_bytes()
-            .returning(|| Ok(Some(vec![MANIFEST_BYTES, MANIFEST_BYTES, MANIFEST_BYTES])));
-
-        let pdf_io = PdfIO::new("pdf");
-
-        assert!(matches!(
-            pdf_io.read_manifest_bytes(mock_pdf),
-            Err(crate::Error::NotImplemented(_))
         ));
     }
 

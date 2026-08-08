@@ -1437,7 +1437,7 @@ impl Claim {
 
     /// Add an assertion to this claim
     /// Allows setting the salt generator and whether to add as created assertion for Claims V2
-    fn add_assertion_impl(
+    pub(crate) fn add_assertion_impl(
         &mut self,
         assertion_builder: &impl AssertionBase,
         salt_generator: &impl SaltGenerator,

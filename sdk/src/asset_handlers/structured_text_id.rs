@@ -31,9 +31,9 @@ const BEGIN_MANIFEST: &str = "-----BEGIN C2PA MANIFEST-----";
 const END_MANIFEST: &str = "-----END C2PA MANIFEST-----";
 const DATA_URI_PREFIX: &str = "data:application/c2pa;base64,";
 
-static SUPPORTED_TYPES: [&str; 21] = [
+static SUPPORTED_TYPES: [&str; 22] = [
     "txt", "md", "markdown", "py", "js", "ts", "jsonc", "yaml", "yml", "toml", "sql", "rs", "sh", "rb", "c",
-    "cpp", "h", "hpp", "cs", "go", "php",
+    "cpp", "h", "hpp", "cs", "go", "php", "xml",
 ];
 
 pub struct StructuredTextIdIO {

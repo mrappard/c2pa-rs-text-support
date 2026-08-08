@@ -271,6 +271,25 @@ impl AsyncTimeStampProvider for AsyncSignerWrapper<'_> {
     }
 }
 
+/// Signs arbitrary `payload` bytes with COSE Sign1 using the given raw signer and DER cert chain.
+///
+/// This is a lower-level signing primitive used by external crates (e.g. the WASM layer) that
+/// need to produce a COSE-signed envelope for identity assertion payloads.
+pub fn sign_payload(
+    signer: &(dyn c2pa_raw_crypto::RawSigner + Sync + Send),
+    cert_chain: &[Vec<u8>],
+    payload: &[u8],
+) -> crate::Result<Vec<u8>> {
+    use crate::crypto::cose::{RawSignerCoseSigner, TimeStampStorage};
+    sign(
+        &RawSignerCoseSigner::new(signer, cert_chain),
+        payload,
+        None,
+        TimeStampStorage::V2_sigTst2_CTT,
+    )
+    .map_err(|e| crate::Error::CoseSignature)
+}
+
 #[cfg(test)]
 mod tests {
     #![allow(clippy::unwrap_used)]
