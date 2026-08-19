@@ -111,6 +111,7 @@ define_fixtures!(
     CA_JPEG => ("CA.jpg", "image/jpeg"),
     XCA_JPEG => ("XCA.jpg", "image/jpeg"),
     SAMPLE_PNG => ("sample1.png", "image/png"),
+    LIBPNG_TEST_PNG => ("libpng-test.png", "image/png"),
     SAMPLE_WAV => ("sample1.wav", "audio/wav"),
     SAMPLE_WEBP => ("sample1.webp", "image/webp"),
     SAMPLE_TIFF => ("TUSCANY.TIF", "image/tiff"),
