@@ -28,7 +28,7 @@ use crate::asset_handlers::pdf_io::PdfIO;
 use crate::{
     asset_handlers::{
         bmff_io::BmffIO, c2pa_io::C2paIO, flac_io::FlacIO, gif_io::GifIO, jpeg_io::JpegIO,
-        jpegxl_io::JpegXlIO, mp3_io::Mp3IO, png_io::PngIO, riff_io::RiffIO, structured_text_id::StructuredTextIdIO, svg_io::SvgIO,
+        jpegxl_io::JpegXlIO, midi_io::MidiIO, mp3_io::Mp3IO, png_io::PngIO, riff_io::RiffIO, structured_text_id::StructuredTextIdIO, svg_io::SvgIO,
         tiff_io::TiffIO,
     },
     asset_io::{AssetIO, CAIRead, CAIReadWrite, CAIReader, CAIWriter, HashObjectPositions},
@@ -55,6 +55,7 @@ lazy_static! {
         Box::new(GifIO::new("")),
         Box::new(FlacIO::new("")),
         Box::new(StructuredTextIdIO::new("")),
+        Box::new(MidiIO::new("")),
     ];
 
     static ref CAI_READERS: HashMap<String, Box<dyn AssetIO>> = {
@@ -531,6 +532,7 @@ pub mod tests {
             Box::new(SvgIO::new("")),
             Box::new(Mp3IO::new("")),
             Box::new(FlacIO::new("")),
+            Box::new(MidiIO::new("")),
         ];
 
         // build handler map
@@ -557,6 +559,7 @@ pub mod tests {
             Box::new(SvgIO::new("")),
             Box::new(Mp3IO::new("")),
             Box::new(FlacIO::new("")),
+            Box::new(MidiIO::new("")),
         ];
 
         // build handler map
@@ -579,6 +582,7 @@ pub mod tests {
             Box::new(SvgIO::new("")),
             Box::new(RiffIO::new("")),
             Box::new(GifIO::new("")),
+            Box::new(MidiIO::new("")),
         ];
 
         // build handler map
@@ -647,6 +651,7 @@ pub mod tests {
         assert!(supported.iter().any(|s| s == "svg"));
         assert!(supported.iter().any(|s| s == "mp3"));
         assert!(supported.iter().any(|s| s == "jxl"));
+        assert!(supported.iter().any(|s| s == "mid"));
     }
 
     fn test_jumbf(asset_type: &str, reader: &mut dyn CAIRead) {
@@ -721,6 +726,13 @@ pub mod tests {
         test_jumbf("wav", &mut reader);
         reader.rewind().unwrap();
         test_remote_ref("wav", &mut reader);
+    }
+
+    #[test]
+    fn test_streams_midi() {
+        let mut reader = std::fs::File::open("tests/fixtures/sample1.mid").unwrap();
+        test_jumbf("mid", &mut reader);
+        // MIDI has no native XMP-equivalent, so it doesn't implement RemoteRefEmbed.
     }
 
     #[test]
