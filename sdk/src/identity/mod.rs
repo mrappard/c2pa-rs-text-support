@@ -28,7 +28,7 @@ pub use identity_assertion::{
     assertion::IdentityAssertion,
     built_in_signature_verifier::{BuiltInCredential, BuiltInSignatureVerifier},
     signature_verifier::{SignatureVerifier, ToCredentialSummary},
-    signer_payload::SignerPayload,
+    signer_payload::{SignerPayload, TrustRegistryClaim},
     validation_error::ValidationError,
 };
 

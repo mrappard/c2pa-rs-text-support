@@ -31,7 +31,7 @@ use crate::{
 /// specification.
 ///
 /// [§5.1, Overview]: https://cawg.io/identity/1.1-draft/#_overview
-#[derive(Clone, Debug, Deserialize, Eq, Serialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub struct SignerPayload {
     /// List of assertions referenced by this credential signature
     pub referenced_assertions: Vec<HashedUri>,
@@ -43,8 +43,39 @@ pub struct SignerPayload {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     #[serde(rename = "role")]
     pub roles: Vec<String>,
+
+    /// Zero or more TRQP-checkable trust-registry claims associated with
+    /// the named actor (e.g. "this entity is enrolled with this authority
+    /// for this action/resource"). Array-shaped because a named actor may
+    /// hold enrollments from more than one authority at once.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub trust_registry: Vec<TrustRegistryClaim>,
     // TO DO: Add expected_* fields.
     // (https://github.com/contentauth/c2pa-rs/issues/816)
+}
+
+/// One TRQP-checkable trust-registry claim — see [`SignerPayload::trust_registry`].
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+pub struct TrustRegistryClaim {
+    /// The TRQP service endpoint that can evaluate this claim.
+    pub trqp_authorization_uri: String,
+
+    /// The entity (named actor) this claim is about — typically the same
+    /// DID that signs this identity assertion.
+    pub entity_id: String,
+
+    /// The authority asserting this claim (e.g. a registry operator).
+    pub authority_id: String,
+
+    /// The action this claim authorizes the entity to perform.
+    pub action: String,
+
+    /// The resource this claim's action applies to.
+    pub resource: String,
+
+    /// Optional additional context for the claim, opaque to this crate.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub context: Option<serde_json::Value>,
 }
 
 impl SignerPayload {
@@ -258,6 +289,7 @@ mod tests {
             referenced_assertions: vec![{ data_hash_ref }],
             roles: vec![],
             sig_type: "NONSENSE".to_owned(),
+            trust_registry: vec![],
         };
 
         assert_eq!(signer_payload, signer_payload.clone());
