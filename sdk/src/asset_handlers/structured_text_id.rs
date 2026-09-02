@@ -527,7 +527,7 @@ mod tests {
         create_manifest_block(asset_type, data)
     }
 
-    fn assert_err_contains<T>(result: Result<T>, expected: &str) {
+    fn assert_err_contains<T: std::fmt::Debug>(result: Result<T>, expected: &str) {
         let err = result.expect_err("expected error");
         assert!(
             format!("{err:?}").contains(expected),
