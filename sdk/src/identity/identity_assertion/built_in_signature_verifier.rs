@@ -375,6 +375,7 @@ mod tests {
                 )],
                 roles: vec!(),
                 sig_type: "cawg.identity_claims_aggregation".to_owned(),
+                trust_registry: vec![],
             }
         );
 

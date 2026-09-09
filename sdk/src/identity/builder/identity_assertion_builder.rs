@@ -21,7 +21,9 @@ use crate::{
     dynamic_assertion::{
         AsyncDynamicAssertion, DynamicAssertion, DynamicAssertionContent, PartialClaim,
     },
-    identity::{builder::AsyncCredentialHolder, IdentityAssertion, SignerPayload},
+    identity::{
+        builder::AsyncCredentialHolder, IdentityAssertion, SignerPayload, TrustRegistryClaim,
+    },
 };
 
 /// An `IdentityAssertionBuilder` gathers together the necessary components
@@ -40,6 +42,7 @@ pub struct IdentityAssertionBuilder {
     credential_holder: Box<dyn CredentialHolder + Sync + Send>,
     referenced_assertions: HashSet<String>,
     roles: Vec<String>,
+    trust_registry: Vec<TrustRegistryClaim>,
 }
 
 impl IdentityAssertionBuilder {
@@ -52,6 +55,7 @@ impl IdentityAssertionBuilder {
             credential_holder: Box::new(credential_holder),
             referenced_assertions: HashSet::new(),
             roles: vec![],
+            trust_registry: vec![],
         }
     }
 
@@ -75,6 +79,12 @@ impl IdentityAssertionBuilder {
         for role in roles {
             self.roles.push(role.to_string());
         }
+    }
+
+    /// Add TRQP-checkable trust-registry claims to attach to the named
+    /// actor for this identity assertion. See [`TrustRegistryClaim`].
+    pub fn add_trust_registry_claims(&mut self, claims: &[TrustRegistryClaim]) {
+        self.trust_registry.extend_from_slice(claims);
     }
 }
 
@@ -120,6 +130,7 @@ impl DynamicAssertion for IdentityAssertionBuilder {
             referenced_assertions,
             sig_type: self.credential_holder.sig_type().to_owned(),
             roles: self.roles.clone(),
+            trust_registry: self.trust_registry.clone(),
         };
 
         let signature_result = self.credential_holder.sign(&signer_payload);
@@ -171,6 +182,7 @@ pub struct AsyncIdentityAssertionBuilder {
 
     referenced_assertions: HashSet<String>,
     roles: Vec<String>,
+    trust_registry: Vec<TrustRegistryClaim>,
 }
 
 // SAFETY: On wasm32, there is no threading, so Send is trivially safe
@@ -187,6 +199,7 @@ impl AsyncIdentityAssertionBuilder {
             credential_holder: Box::new(credential_holder),
             referenced_assertions: HashSet::new(),
             roles: vec![],
+            trust_registry: vec![],
         }
     }
 
@@ -210,6 +223,12 @@ impl AsyncIdentityAssertionBuilder {
         for role in roles {
             self.roles.push(role.to_string());
         }
+    }
+
+    /// Add TRQP-checkable trust-registry claims to attach to the named
+    /// actor for this identity assertion. See [`TrustRegistryClaim`].
+    pub fn add_trust_registry_claims(&mut self, claims: &[TrustRegistryClaim]) {
+        self.trust_registry.extend_from_slice(claims);
     }
 }
 
@@ -257,6 +276,7 @@ impl AsyncDynamicAssertion for AsyncIdentityAssertionBuilder {
             referenced_assertions,
             sig_type: self.credential_holder.sig_type().to_owned(),
             roles: self.roles.clone(),
+            trust_registry: self.trust_registry.clone(),
         };
 
         let signature_result = self.credential_holder.sign(&signer_payload).await;
