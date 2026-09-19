@@ -399,7 +399,22 @@ impl CAIWriter for StructuredTextIdIO {
         input_stream: &mut dyn CAIRead,
     ) -> Result<Vec<HashObjectPositions>> {
         input_stream.rewind()?;
-        let info = detect_manifest_location(input_stream)?.ok_or(Error::JumbfNotFound)?;
+        let info = match detect_manifest_location(input_stream)? {
+            Some(info) => info,
+            None => {
+                // No manifest markers in this stream: nothing to exclude from hashing.
+                // This is the normal case for no-embed/sidecar signing, where the
+                // manifest never gets (or has already been stripped) from the asset —
+                // the whole stream is the hashed content, not an error condition.
+                input_stream.rewind()?;
+                let total_len = stream_len(input_stream)? as usize;
+                return Ok(vec![HashObjectPositions {
+                    offset: 0,
+                    length: total_len,
+                    htype: HashBlockObjectType::Other,
+                }]);
+            }
+        };
 
         let mut positions = Vec::new();
 
