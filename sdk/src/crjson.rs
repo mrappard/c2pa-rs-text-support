@@ -205,6 +205,68 @@ struct CrJsonDocument {
     manifests: Vec<CrJsonManifest>,
     #[serde(rename = "jsonGenerator")]
     json_generator: JsonGenerator,
+    /// Results for the asset when no manifest could be located. crJSON only defines
+    /// per-manifest results, so this uses the document's `extras` namespace.
+    #[cfg(feature = "spec_2_4_text")]
+    #[serde(
+        rename = "extras:validationResults",
+        skip_serializing_if = "Option::is_none"
+    )]
+    validation_results: Option<ManifestValidationResults>,
+}
+
+/// Spec 2.4 failure codes for text embeddings whose manifest store cannot be located
+/// (A.7, A.8, A.9).
+#[cfg(feature = "spec_2_4_text")]
+const MANIFEST_LOCATION_FAILURES: [&str; 8] = [
+    "manifest.html.multipleManifests",
+    "manifest.structuredText.emptyReference",
+    "manifest.structuredText.malformedReference",
+    "manifest.structuredText.multipleReferences",
+    "manifest.structuredText.noManifest",
+    "manifest.structuredText.noResolutionPath",
+    "manifest.text.corruptedWrapper",
+    "manifest.text.multipleWrappers",
+];
+
+/// crJSON for an asset whose manifest store could not be located: an empty `manifests`
+/// array and the failure in `extras:validationResults`. Returns `None` for other errors.
+#[cfg(feature = "spec_2_4_text")]
+pub(crate) fn from_manifest_location_failure(error: &Error) -> Option<Value> {
+    let Error::InvalidAsset(message) = error else {
+        return None;
+    };
+    let code = MANIFEST_LOCATION_FAILURES
+        .iter()
+        .find(|code| message == *code)?;
+    let doc = CrJsonDocument {
+        context: crjson_context(),
+        manifests: Vec::new(),
+        json_generator: json_generator(),
+        validation_results: Some(ManifestValidationResults {
+            success: Vec::new(),
+            informational: Vec::new(),
+            failure: vec![ValidationStatus::new_failure(*code)
+                .set_explanation("the manifest store could not be located".to_string())],
+            spec_version: CRJSON_SPEC_VERSION,
+            validation_time: Utc::now().to_rfc3339(),
+        }),
+    };
+    serde_json::to_value(doc).ok()
+}
+
+fn crjson_context() -> Value {
+    json!({
+        "@vocab": "https://c2pa.org/crjson",
+        "extras": "https://c2pa.org/crjson/extras"
+    })
+}
+
+fn json_generator() -> JsonGenerator {
+    JsonGenerator {
+        name: "c2pa-rs",
+        version: env!("CARGO_PKG_VERSION"),
+    }
 }
 
 // ── Public entry point ──────────────────────────────────────────────────────
@@ -253,15 +315,11 @@ impl<'a> CrJsonExporter<'a> {
         });
 
         Ok(CrJsonDocument {
-            context: json!({
-                "@vocab": "https://c2pa.org/crjson",
-                "extras": "https://c2pa.org/crjson/extras"
-            }),
+            context: crjson_context(),
             manifests: indexed.into_iter().map(|(_, m)| m).collect(),
-            json_generator: JsonGenerator {
-                name: "c2pa-rs",
-                version: env!("CARGO_PKG_VERSION"),
-            },
+            json_generator: json_generator(),
+            #[cfg(feature = "spec_2_4_text")]
+            validation_results: None,
         })
     }
 
@@ -850,6 +908,22 @@ mod tests {
     use crate::{reader::Reader, validation_results::ValidationState};
 
     const IMAGE_WITH_MANIFEST: &[u8] = include_bytes!("../tests/fixtures/CA.jpg");
+
+    #[test]
+    #[cfg(feature = "spec_2_4_text")]
+    fn test_manifest_location_failure_crjson() {
+        let doc = from_manifest_location_failure(&Error::InvalidAsset(
+            "manifest.text.multipleWrappers".to_string(),
+        ))
+        .expect("text location failure");
+        assert_eq!(doc["manifests"], json!([]));
+        assert!(doc.get("jsonGenerator").is_some());
+        let failure = &doc["extras:validationResults"]["failure"];
+        assert_eq!(failure[0]["code"], "manifest.text.multipleWrappers");
+
+        assert!(from_manifest_location_failure(&Error::JumbfNotFound).is_none());
+        assert!(from_manifest_location_failure(&Error::InvalidAsset("other".to_string())).is_none());
+    }
 
     #[test]
     fn test_jpeg_trust_reader_from_stream() -> Result<()> {

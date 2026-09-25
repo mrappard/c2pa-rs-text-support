@@ -352,6 +352,14 @@ pub struct HtmlIO {}
 impl C2paReader for HtmlIO {
     fn read_c2pa(&self, reader: &mut dyn ReadSeek) -> Result<Vec<u8>> {
         let content = read_document(reader)?;
+        // Spec 2.4 reports multiple manifest elements, where later drafts treat the document
+        // as having no manifest
+        #[cfg(feature = "spec_2_4_text")]
+        if find_manifest_elements(&content).len() > 1 {
+            return Err(Error::InvalidAsset(
+                "manifest.html.multipleManifests".to_string(),
+            ));
+        }
         match manifest_element(&content) {
             Some(ManifestElement::Script {
                 content: (from, to),
@@ -638,7 +646,14 @@ mod tests {
             "<html><head><script type=\"application/c2pa\">YQ==</script><script type=\"application/c2pa\">Yg==</script></head></html>",
             "<html><head><script type=\"application/c2pa\">YQ==</script><link rel=\"c2pa-manifest\" href=\"https://example.com/a.c2pa\"></head></html>",
         ] {
-            assert!(matches!(read_back(doc.as_bytes()), Err(Error::JumbfNotFound)));
+            if cfg!(feature = "spec_2_4_text") {
+                assert!(matches!(
+                    read_back(doc.as_bytes()),
+                    Err(Error::InvalidAsset(code)) if code == "manifest.html.multipleManifests"
+                ));
+            } else {
+                assert!(matches!(read_back(doc.as_bytes()), Err(Error::JumbfNotFound)));
+            }
             // writing replaces them all with a single script
             let out = String::from_utf8(embed(doc, b"one")).unwrap();
             assert_eq!(find_manifest_elements(out.as_bytes()).len(), 1);

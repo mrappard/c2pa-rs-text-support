@@ -58,6 +58,12 @@ unstable_structured_text = []
 # stability guarantees and may change or be removed in any release. See
 # docs/experimental-features.md.
 unstable_html = []
+# c2pa-rs-text-support only: Spec 2.4 behavior for the text handlers, used for C2PA
+# Conformance testing. Reports the 2.4 manifest location failure codes (manifest.text.*,
+# manifest.structuredText.*, manifest.html.multipleManifests) where later drafts treat the
+# asset as having no manifest, handles CSV and TSV as plain text, and reports those failures
+# in crJSON (Reader::crjson_for_load_error).
+spec_2_4_text = ["unstable_plain_text", "unstable_structured_text", "unstable_html"]
 # TODO: make our async tests always use the async API so we don't need ureq + reqwest
 #       see https://github.com/contentauth/c2pa-rs/issues/1364
 default_http = ["http_reqwest", "http_ureq", "http_wasi", "http_wstd"]
@@ -70,6 +76,10 @@ http_reqwest = ["dep:reqwest"]
 # The diagnostics feature is unsupported and might be removed.
 # It enables some low-overhead timing features used in our development cycle.
 diagnostics = []
+
+[[example]]
+name = "text_conformance_vectors"
+required-features = ["file_io", "spec_2_4_text"]
 
 [[example]]
 name = "cawg_identity"

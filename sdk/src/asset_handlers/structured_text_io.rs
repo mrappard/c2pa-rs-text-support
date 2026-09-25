@@ -119,6 +119,42 @@ fn comment_style(asset_type: &str) -> Option<CommentStyle> {
     })
 }
 
+/// Spec 2.4 reports why a structured-text manifest store cannot be located, where later
+/// drafts treat the asset as having no manifest.
+#[cfg(feature = "spec_2_4_text")]
+fn spec_2_4_location_failure(text: &str) -> Option<&'static str> {
+    let blocks = find_blocks(text);
+    if blocks.len() > 1 {
+        return Some("manifest.structuredText.multipleReferences");
+    }
+    if let [block] = blocks.as_slice() {
+        return match parse_manifest_reference(&block.reference) {
+            Err(_) => Some("manifest.structuredText.malformedReference"),
+            Ok(ManifestReference::Embedded(_)) => None,
+            Ok(ManifestReference::External) => {
+                // a non-C2PA data: URI or a scheme that cannot be fetched
+                let reference = block.reference.trim().to_ascii_lowercase();
+                (!(reference.starts_with("https://") || reference.starts_with("http://")))
+                    .then_some("manifest.structuredText.noResolutionPath")
+            }
+        };
+    }
+
+    // No block: a lone delimiter, or a pair around something that is not a reference.
+    match (text.find(BEGIN_DELIMITER), text.find(END_DELIMITER)) {
+        (None, None) => None,
+        (Some(begin), Some(end)) if end > begin => {
+            let reference = text[begin + BEGIN_DELIMITER.len()..end].trim();
+            Some(if reference.is_empty() {
+                "manifest.structuredText.emptyReference"
+            } else {
+                "manifest.structuredText.malformedReference"
+            })
+        }
+        _ => Some("manifest.structuredText.noManifest"),
+    }
+}
+
 pub struct StructuredTextIO {
     asset_type: String,
 }
@@ -287,6 +323,10 @@ fn insert_block(cleaned: &str, reference: &str, style: CommentStyle, asset_type:
 impl C2paReader for StructuredTextIO {
     fn read_c2pa(&self, reader: &mut dyn ReadSeek) -> Result<Vec<u8>> {
         let text = text_common::read_text_stream(reader)?;
+        #[cfg(feature = "spec_2_4_text")]
+        if let Some(code) = spec_2_4_location_failure(&text) {
+            return Err(Error::InvalidAsset(code.to_string()));
+        }
 
         // More than one block ⇒ treat as no manifest (A.9).
         if count_blocks(&text) != 1 {
@@ -592,10 +632,17 @@ mod tests {
     fn multiple_blocks_treated_as_no_manifest() {
         let mut text = embed("yaml", "a: 1\n", b"first");
         text.push_str("# -----BEGIN C2PA MANIFEST----- data:application/c2pa;base64,AAAA -----END C2PA MANIFEST-----\n");
-        assert!(matches!(
-            read_back("yaml", &text),
-            Err(Error::JumbfNotFound)
-        ));
+        if cfg!(feature = "spec_2_4_text") {
+            assert!(matches!(
+                read_back("yaml", &text),
+                Err(Error::InvalidAsset(code)) if code == "manifest.structuredText.multipleReferences"
+            ));
+        } else {
+            assert!(matches!(
+                read_back("yaml", &text),
+                Err(Error::JumbfNotFound)
+            ));
+        }
     }
 
     #[test]

@@ -725,6 +725,17 @@ impl Reader {
         self.crjson_checked().unwrap_or_else(|_| "{}".to_string())
     }
 
+    /// Get crJSON for an asset that failed to load because its manifest store could not be
+    /// located under Spec 2.4, such as a text asset with two embedded manifests. The document
+    /// has no manifests and reports the failure code in `extras:validationResults`.
+    ///
+    /// Returns `None` when `error` is not a manifest location failure.
+    #[cfg(feature = "spec_2_4_text")]
+    pub fn crjson_for_load_error(error: &Error) -> Option<String> {
+        crate::crjson::from_manifest_location_failure(error)
+            .and_then(|v| serde_json::to_string_pretty(&v).ok())
+    }
+
     /// Get the manifest store as a pretty-printed crJSON string, returning an error if it fails.
     ///
     /// crJSON is a standardized JSON format for C2PA manifest data.

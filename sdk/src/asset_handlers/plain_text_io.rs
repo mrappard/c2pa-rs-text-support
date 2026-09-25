@@ -51,7 +51,18 @@ use crate::{
     },
 };
 
+#[cfg(not(feature = "spec_2_4_text"))]
 const SUPPORTED_TYPES: [&str; 2] = ["txt", "text/plain"];
+/// Spec 2.4 conformance lists CSV and TSV as unstructured text.
+#[cfg(feature = "spec_2_4_text")]
+const SUPPORTED_TYPES: [&str; 6] = [
+    "txt",
+    "text/plain",
+    "csv",
+    "text/csv",
+    "tsv",
+    "text/tab-separated-values",
+];
 
 /// Used only to size a wrapper before the real manifest is known, so
 /// [`get_object_locations`](C2paWriter::get_object_locations) can report an
@@ -233,6 +244,21 @@ mod wrapper {
             }
         });
         found
+    }
+
+    /// Whether `text` holds a run whose magic matches but whose frame does not decode.
+    #[cfg(feature = "spec_2_4_text")]
+    pub(super) fn has_corrupted_candidate(text: &str) -> bool {
+        let mut corrupted = false;
+        scan(text, |run, start, length| {
+            if run.len() >= MAGIC.len()
+                && run[..MAGIC.len()] == MAGIC
+                && decode_frame(run, start, length).is_none()
+            {
+                corrupted = true;
+            }
+        });
+        corrupted
     }
 
     /// The single wrapper in `text`, or `None` if there is not exactly one. A.8 leaves
@@ -450,6 +476,19 @@ pub(crate) fn verify_text_data_hash(dh: &DataHash, content: &[u8], alg: &str) ->
     }
 }
 
+/// Spec 2.4 reports why a plain-text manifest store cannot be located (A.8.7.1), where
+/// later drafts treat the asset as having no manifest.
+#[cfg(feature = "spec_2_4_text")]
+fn spec_2_4_location_failure(text: &str) -> Option<&'static str> {
+    if wrapper::has_corrupted_candidate(text) {
+        Some("manifest.text.corruptedWrapper")
+    } else if wrapper::locate_all(text).len() > 1 {
+        Some("manifest.text.multipleWrappers")
+    } else {
+        None
+    }
+}
+
 pub struct PlainTextIO {
     _asset_type: String,
 }
@@ -457,6 +496,10 @@ pub struct PlainTextIO {
 impl C2paReader for PlainTextIO {
     fn read_c2pa(&self, reader: &mut dyn ReadSeek) -> Result<Vec<u8>> {
         let text = read_text_stream(reader)?;
+        #[cfg(feature = "spec_2_4_text")]
+        if let Some(code) = spec_2_4_location_failure(&text) {
+            return Err(Error::InvalidAsset(code.to_string()));
+        }
         let w = wrapper::extract(&text).ok_or(Error::JumbfNotFound)?;
         if w.payload.is_empty() {
             return Err(Error::JumbfNotFound);
@@ -543,6 +586,18 @@ impl AssetIO for PlainTextIO {
 
     fn supported_types(&self) -> &[&str] {
         &SUPPORTED_TYPES
+    }
+
+    #[cfg(feature = "spec_2_4_text")]
+    fn mime_type_map(&self) -> Vec<(String, String)> {
+        [
+            ("txt", "text/plain"),
+            ("csv", "text/csv"),
+            ("tsv", "text/tab-separated-values"),
+        ]
+        .into_iter()
+        .map(|(ext, mime)| (ext.to_string(), mime.to_string()))
+        .collect()
     }
 }
 
@@ -682,7 +737,15 @@ mod tests {
         );
         let src = format!("Body{junk}");
         let out = embed(&src, b"store");
-        assert_eq!(read_back(&out).unwrap(), b"store");
+        if cfg!(feature = "spec_2_4_text") {
+            // Spec 2.4 rejects a corrupted wrapper (A.8.7.1)
+            assert!(matches!(
+                read_back(&out),
+                Err(Error::InvalidAsset(code)) if code == "manifest.text.corruptedWrapper"
+            ));
+        } else {
+            assert_eq!(read_back(&out).unwrap(), b"store");
+        }
         assert!(
             out.contains(&junk),
             "the corrupted candidate must survive untouched, not be silently dropped"
