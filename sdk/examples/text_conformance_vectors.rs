@@ -22,6 +22,7 @@ const HUMAN_WRITTEN: &str = "http://cv.iptc.org/newscodes/digitalsourcetype/digi
 const HTML_DOC: &str = "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>Example</title>\n</head>\n<body>\n<p>Content here.</p>\n</body>\n</html>\n";
 const TXT_DOC: &str = "The quick brown fox jumps over the lazy dog.\nSecond line.\n";
 const CSV_DOC: &str = "name,city\nAda,London\nGrace,New York\n";
+const TSV_DOC: &str = "name\tcity\nAda\tLondon\nGrace\tNew York\n";
 const MD_DOC: &str = "# Title\n\nSome markdown text.\n";
 
 struct Case {
@@ -126,6 +127,18 @@ fn cases() -> Result<Vec<Case>> {
     add("txt-edited", "txt", "text/plain", "An edit of txt-valid: first action c2pa.opened with txt-valid as the parentOf ingredient.", sign_edit("txt", &txt, b"The quick brown fox jumps over the lazy cat.\n")?, None);
     let csv = sign("csv", CSV_DOC.as_bytes())?;
     add("csv-valid", "csv", "text/csv", "Signed CSV using the unstructured text wrapper.", csv, None);
+    // Later drafts require an external manifest covering the complete file for CSV and TSV,
+    // whose record grammar has no place for a manifest.
+    for (name, ext, media_type, doc) in [
+        ("csv-sidecar", "csv", "text/csv", CSV_DOC),
+        ("tsv-sidecar", "tsv", "text/tab-separated-values", TSV_DOC),
+    ] {
+        let mut builder = Builder::from_context(Context::new()).with_definition(definition(created()))?;
+        builder.set_no_embed(true);
+        let (asset, manifest) = sign_with(&mut builder, ext, doc.as_bytes())?;
+        assert_eq!(asset, doc.as_bytes(), "{name}: a sidecar-signed asset is left unchanged");
+        add(name, ext, media_type, "Unchanged file with an external manifest (sidecar) whose data hash covers the complete file and has no exclusions. Validated from the .c2pa sidecar.", asset, Some(manifest));
+    }
 
     // HTML (Spec 2.4 §A.7)
     let html = sign("html", HTML_DOC.as_bytes())?;
