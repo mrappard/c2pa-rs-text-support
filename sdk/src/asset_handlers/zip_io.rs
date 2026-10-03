@@ -248,6 +248,8 @@ impl AssetIO for ZipIO {
             // OpenXPS
             "oxps",
             "application/oxps",
+            // Keras 3 models (no registered media type)
+            "keras",
         ]
     }
 }
