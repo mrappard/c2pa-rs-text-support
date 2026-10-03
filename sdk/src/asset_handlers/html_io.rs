@@ -57,9 +57,8 @@ enum ManifestElement {
 impl ManifestElement {
     fn range(&self) -> (usize, usize) {
         match self {
-            ManifestElement::Script { start, end, .. } | ManifestElement::Link { start, end, .. } => {
-                (*start, *end)
-            }
+            ManifestElement::Script { start, end, .. }
+            | ManifestElement::Link { start, end, .. } => (*start, *end),
         }
     }
 }
@@ -130,7 +129,9 @@ fn parse_attributes(tag: &[u8]) -> Vec<(String, String)> {
         }
 
         let name_start = i;
-        while i < tag.len() && !tag[i].is_ascii_whitespace() && !matches!(tag[i], b'=' | b'>' | b'/')
+        while i < tag.len()
+            && !tag[i].is_ascii_whitespace()
+            && !matches!(tag[i], b'=' | b'>' | b'/')
         {
             i += 1;
         }
@@ -405,7 +406,8 @@ impl C2paWriter for HtmlIO {
             None => {
                 // No manifest yet: report where the script element will be embedded, sized
                 // with a placeholder, so the data hash reserves room for the exclusion.
-                let with_script = replace_manifest_elements(&content, &script_element(PLACEHOLDER_STORE));
+                let with_script =
+                    replace_manifest_elements(&content, &script_element(PLACEHOLDER_STORE));
                 match manifest_element(&with_script) {
                     Some(ManifestElement::Script { start, end, .. }) => {
                         Ok(hash_positions(with_script.len(), start, end))
@@ -437,9 +439,7 @@ impl AssetPatch for HtmlIO {
 
         let new_element = script_element(store_bytes);
         if new_element.len() != end - start {
-            return Err(Error::InvalidAsset(
-                "patch_c2pa size mismatch".to_string(),
-            ));
+            return Err(Error::InvalidAsset("patch_c2pa size mismatch".to_string()));
         }
         stream.seek(SeekFrom::Start(start as u64))?;
         stream.write_all(new_element.as_bytes())?;
@@ -530,7 +530,11 @@ mod tests {
     fn embed(content: &str, store: &[u8]) -> Vec<u8> {
         let mut out = Cursor::new(Vec::new());
         HtmlIO::new("html")
-            .write_c2pa(&mut Cursor::new(content.as_bytes().to_vec()), &mut out, store)
+            .write_c2pa(
+                &mut Cursor::new(content.as_bytes().to_vec()),
+                &mut out,
+                store,
+            )
             .unwrap();
         out.into_inner()
     }
@@ -559,7 +563,13 @@ mod tests {
     fn replaces_existing_script() {
         let once = String::from_utf8(embed(DOC, b"old")).unwrap();
         let twice = embed(&once, b"new");
-        assert_eq!(String::from_utf8(twice.clone()).unwrap().matches("application/c2pa").count(), 1);
+        assert_eq!(
+            String::from_utf8(twice.clone())
+                .unwrap()
+                .matches("application/c2pa")
+                .count(),
+            1
+        );
         assert_eq!(read_back(&twice).unwrap(), b"new");
     }
 
@@ -588,7 +598,10 @@ mod tests {
         let locations = HtmlIO::new("html")
             .get_object_locations(&mut Cursor::new(out))
             .unwrap();
-        let c2pa = locations.iter().find(|p| p.htype == ObjectType::C2pa).unwrap();
+        let c2pa = locations
+            .iter()
+            .find(|p| p.htype == ObjectType::C2pa)
+            .unwrap();
         assert_eq!((c2pa.offset, c2pa.length), (start, end - start));
     }
 
@@ -597,7 +610,10 @@ mod tests {
         let locations = HtmlIO::new("html")
             .get_object_locations(&mut Cursor::new(DOC.as_bytes().to_vec()))
             .unwrap();
-        let c2pa = locations.iter().find(|p| p.htype == ObjectType::C2pa).unwrap();
+        let c2pa = locations
+            .iter()
+            .find(|p| p.htype == ObjectType::C2pa)
+            .unwrap();
         assert_eq!(c2pa.offset, DOC.find("</head>").unwrap() as u64);
         assert!(c2pa.length > 0);
     }
@@ -606,7 +622,9 @@ mod tests {
     fn link_element_is_hashed_and_readable_as_url() {
         let out = link(DOC, "https://example.com/a.c2pa?x=1&y=2");
         let text = String::from_utf8(out.clone()).unwrap();
-        assert!(text.contains("<link rel=\"c2pa-manifest\" href=\"https://example.com/a.c2pa?x=1&amp;y=2\""));
+        assert!(text.contains(
+            "<link rel=\"c2pa-manifest\" href=\"https://example.com/a.c2pa?x=1&amp;y=2\""
+        ));
 
         let locations = HtmlIO::new("html")
             .get_object_locations(&mut Cursor::new(out.clone()))
@@ -651,7 +669,10 @@ mod tests {
             "<html><head><!-- <script type=\"application/c2pa\">YQ==</script> --></head><body><script type=\"application/c2pa\">{}</script></body></html>",
             base64::encode(b"x")
         );
-        assert!(matches!(read_back(doc.as_bytes()), Err(Error::JumbfNotFound)));
+        assert!(matches!(
+            read_back(doc.as_bytes()),
+            Err(Error::JumbfNotFound)
+        ));
     }
 
     #[test]
@@ -676,7 +697,9 @@ mod tests {
     #[test]
     fn patch_replaces_same_size_store() {
         let mut stream = Cursor::new(embed(DOC, b"aaaa"));
-        HtmlIO::new("html").patch_c2pa(&mut stream, b"bbbb").unwrap();
+        HtmlIO::new("html")
+            .patch_c2pa(&mut stream, b"bbbb")
+            .unwrap();
         assert_eq!(read_back(&stream.into_inner()).unwrap(), b"bbbb");
     }
 }

@@ -3073,10 +3073,11 @@ impl Claim {
                         if let Some(exclusions) = &dh.exclusions {
                             if plain_text.is_none()
                                 && !data_hash_exclusions_match_manifest(
-                                exclusions,
-                                svi.manifest_store_range.as_ref(),
-                                svi.is_embedded,
-                            ) {
+                                    exclusions,
+                                    svi.manifest_store_range.as_ref(),
+                                    svi.is_embedded,
+                                )
+                            {
                                 log_item!(
                                     claim.assertion_uri(&hash_binding_assertion.label()),
                                     "data hash exclusion does not match the manifest location in the asset",
@@ -3150,7 +3151,9 @@ impl Claim {
                                         format!("asset hash error, name: {name}, error: {e}"),
                                         "verify_internal"
                                     )
-                                    .validation_status(validation_status::ASSERTION_DATAHASH_MISMATCH)
+                                    .validation_status(
+                                        validation_status::ASSERTION_DATAHASH_MISMATCH,
+                                    )
                                     .failure(
                                         validation_log,
                                         Error::HashMismatch(format!("Asset hash failure: {e}")),

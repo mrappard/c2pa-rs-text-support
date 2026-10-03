@@ -21,6 +21,8 @@ pub mod html_io;
 pub(crate) mod id3_helper;
 pub mod jpeg_io;
 pub mod jpegxl_io;
+#[cfg(feature = "unstable_midi")]
+pub mod midi_io;
 pub mod mp3_io;
 pub mod onnx_io;
 pub mod parquet_io;

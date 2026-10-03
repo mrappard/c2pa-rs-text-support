@@ -58,6 +58,10 @@ unstable_structured_text = []
 # stability guarantees and may change or be removed in any release. See
 # docs/experimental-features.md.
 unstable_html = []
+# Native Standard MIDI File asset handler (manifest in a Sequencer-Specific Meta Event).
+# Experimental feature: exempt from the crate's usual semantic-versioning stability guarantees
+# and may change or be removed in any release. See docs/experimental-features.md.
+unstable_midi = []
 # TODO: make our async tests always use the async API so we don't need ureq + reqwest
 #       see https://github.com/contentauth/c2pa-rs/issues/1364
 default_http = ["http_reqwest", "http_ureq", "http_wasi", "http_wstd"]
