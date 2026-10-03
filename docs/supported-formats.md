@@ -28,6 +28,7 @@ The following table summarizes the supported media (asset) file formats. This in
 | `otf`           | `font/otf` <br/>OpenType/TrueType (SFNT) fonts; see note below.                 |
 | `pdf`           | `application/pdf`                                                               |
 | `png`           | `image/png`                                                                     |
+| `safetensors`   | (none registered) <br/>The manifest is stored Base64-encoded as `c2pa:manifest` in the JSON header's `__metadata__`. |
 | `svg`           | `image/svg+xml`                                                                 |
 | `tif`, `tiff`   | `image/tiff`                                                                    |
 | `ttf`           | `font/ttf` <br/>OpenType/TrueType (SFNT) fonts; see note below.                 |
