@@ -21,6 +21,7 @@ pub mod jpeg_io;
 pub mod jpegxl_io;
 pub mod mp3_io;
 pub mod onnx_io;
+pub mod parquet_io;
 #[cfg(feature = "unstable_plain_text")]
 pub mod plain_text_io;
 pub mod png_io;

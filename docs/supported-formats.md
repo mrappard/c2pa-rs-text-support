@@ -27,6 +27,7 @@ The following table summarizes the supported media (asset) file formats. This in
 | `mov`           | `video/quicktime`                                                               |
 | `otf`           | `font/otf` <br/>OpenType/TrueType (SFNT) fonts; see note below.                 |
 | `onnx`          | (none registered) <br/>The manifest is stored Base64-encoded in a `c2pa:manifest` entry of the model's `metadata_props`. |
+| `parquet`       | `application/vnd.apache.parquet` <br/>The manifest is stored Base64-encoded as `c2pa:manifest` in the footer's `key_value_metadata`. Encrypted files are not supported. |
 | `pdf`           | `application/pdf`                                                               |
 | `png`           | `image/png`                                                                     |
 | `safetensors`   | (none registered) <br/>The manifest is stored Base64-encoded as `c2pa:manifest` in the JSON header's `__metadata__`. |
