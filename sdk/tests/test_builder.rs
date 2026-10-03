@@ -1147,6 +1147,75 @@ fn test_builder_sign_deflated_zip_with_data_descriptors() -> Result<()> {
     Ok(())
 }
 
+/// OPC consumers such as PowerPoint and Word reject or "repair" a package containing a part
+/// with no declared content type, which removes the manifest. Signing must declare one.
+#[test]
+fn test_builder_ooxml_declares_c2pa_content_type() -> Result<()> {
+    use std::io::Read;
+
+    let context = Context::new().with_settings(test_settings())?.into_shared();
+    let mut builder = Builder::from_shared_context(&context);
+    builder.set_intent(BuilderIntent::Edit);
+
+    let mut source = Cursor::new(include_bytes!("fixtures/sample1.docx"));
+    let mut dest = Cursor::new(Vec::new());
+    builder.save_to_stream("docx", &mut source, &mut dest)?;
+
+    dest.rewind()?;
+    let reader = Reader::from_shared_context(&context).with_stream("docx", &mut dest)?;
+    assert_eq!(reader.validation_state(), ValidationState::Trusted);
+
+    let mut archive = zip::ZipArchive::new(dest).unwrap();
+    let mut content_types = String::new();
+    archive
+        .by_name("[Content_Types].xml")
+        .unwrap()
+        .read_to_string(&mut content_types)?;
+    assert!(
+        content_types.contains(r#"<Default Extension="c2pa" ContentType="application/c2pa"/>"#),
+        "{content_types}"
+    );
+    Ok(())
+}
+
+/// Re-signing a signed ZIP-based file replaces the previous manifest's bytes rather than
+/// leaving them in the file.
+#[test]
+fn test_builder_resign_zip() -> Result<()> {
+    let context = Context::new().with_settings(test_settings())?.into_shared();
+    for (format, data) in [
+        ("docx", &include_bytes!("fixtures/sample1.docx")[..]),
+        ("odt", &include_bytes!("fixtures/sample1.odt")[..]),
+    ] {
+        let mut current = data.to_vec();
+        for round in 1..=3 {
+            let mut builder = Builder::from_shared_context(&context);
+            builder.set_intent(BuilderIntent::Edit);
+            let mut dest = Cursor::new(Vec::new());
+            builder.save_to_stream(format, &mut Cursor::new(&current), &mut dest)?;
+            current = dest.into_inner();
+
+            let reader =
+                Reader::from_shared_context(&context).with_stream(format, Cursor::new(&current))?;
+            assert_eq!(reader.validation_state(), ValidationState::Trusted);
+            assert_eq!(reader.manifests().len(), round);
+
+            // Exactly one manifest in the file: the previous manifest's local header (and its
+            // data after it) must not have been left behind.
+            let name = b"META-INF/content_credential.c2pa";
+            let local_headers = current
+                .windows(30 + name.len())
+                .filter(|w| w.starts_with(b"PK\x03\x04") && &w[30..] == name)
+                .count();
+            assert_eq!(
+                local_headers, 1,
+                "{format}: earlier manifests left in the file"
+            );
+        }
+    }
+    Ok(())
+}
+
 #[test]
 fn test_builder_compressed_manifests() -> Result<()> {
     let mut settings = test_settings();
