@@ -19,10 +19,8 @@ use std::{
     io::{Cursor, Read, Seek},
 };
 
-use asn1_rs::FromDer;
 use async_generic::async_generic;
 use log::error;
-use x509_parser::prelude::X509Certificate;
 
 use crate::{
     assertion::{Assertion, AssertionBase, AssertionData, AssertionDecodeError},
@@ -2162,22 +2160,11 @@ impl Store {
                     validation_log.pop_current_uri();
 
                     if let Ok(response) = checked {
-                        let der = response.ocsp_der;
-                        let mut serials = vec![response.certificate_serial_num];
-                        if let Some(leaf_der) = signing_cert_chain.first() {
-                            if let Ok((_, leaf)) = X509Certificate::from_der(leaf_der) {
-                                let leaf_serial = leaf.serial.to_string();
-                                if !serials.contains(&leaf_serial) {
-                                    serials.push(leaf_serial);
-                                }
-                            }
-                        }
-                        for serial in serials {
-                            svi.certificate_statuses
-                                .entry(serial)
-                                .or_default()
-                                .push(der.clone());
-                        }
+                        let ocsp_ders = svi
+                            .certificate_statuses
+                            .entry(response.certificate_serial_num)
+                            .or_default();
+                        ocsp_ders.push(response.ocsp_der);
                     }
                 }
             }
