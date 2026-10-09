@@ -226,7 +226,7 @@ impl OcspResponse {
                         // As soon as we find one successful match, nothing else matters.
                         log_item!("", "certificate not revoked", "check_ocsp_response")
                             .validation_status(validation_codes::SIGNING_CREDENTIAL_NOT_REVOKED)
-                            .success(validation_log);
+                            .success(&mut internal_validation_log);
 
                         return Ok(output);
                     }
