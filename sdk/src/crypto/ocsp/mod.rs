@@ -216,18 +216,17 @@ impl OcspResponse {
                     }
 
                     if !in_range {
-                        log_item!("", "certificate revoked", "check_ocsp_response")
-                            .validation_status(validation_codes::SIGNING_CREDENTIAL_REVOKED)
-                            .failure_no_throw(
-                                &mut internal_validation_log,
-                                OcspError::CertificateRevoked,
-                            );
+                        // A GOOD response outside its validity window is
+                        // unusable, but it is not evidence of revocation.
+                        // Leave the log empty so the caller can report OCSP
+                        // as skipped when fetching is disabled.
                     } else {
                         // As soon as we find one successful match, nothing else matters.
                         log_item!("", "certificate not revoked", "check_ocsp_response")
                             .validation_status(validation_codes::SIGNING_CREDENTIAL_NOT_REVOKED)
                             .success(&mut internal_validation_log);
 
+                        validation_log.append(&internal_validation_log);
                         return Ok(output);
                     }
                 }
@@ -381,22 +380,22 @@ fn cert_id_matches_signer(cert_id: &CertId, signing_cert_chain: &[Vec<u8>]) -> b
             continue;
         };
 
-    // serialNumber identifies the end-entity certificate.
+        // serialNumber identifies the end-entity certificate.
         if cert_id.serial_number != subject.tbs_certificate.serial_number {
             continue;
         }
 
-    // issuerNameHash and issuerKeyHash are computed over the issuer using the
-    // hash algorithm named in the response's certId (this matches how the OCSP
-    // request is constructed in `ocsp/fetch.rs`).
+        // issuerNameHash and issuerKeyHash are computed over the issuer using the
+        // hash algorithm named in the response's certId (this matches how the OCSP
+        // request is constructed in `ocsp/fetch.rs`).
         let Ok(issuer_name_raw) = rasn::der::encode(&issuer.tbs_certificate.subject) else {
             continue;
         };
-    let issuer_key_raw = issuer
-        .tbs_certificate
-        .subject_public_key_info
-        .subject_public_key
-        .as_raw_slice();
+        let issuer_key_raw = issuer
+            .tbs_certificate
+            .subject_public_key_info
+            .subject_public_key
+            .as_raw_slice();
 
         let Some(expected_name_hash) =
             hash_by_oid(&cert_id.hash_algorithm.algorithm, &issuer_name_raw)
