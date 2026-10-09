@@ -1,9 +1,9 @@
 # Combined branch conformance results
 
 Suite revision: `9837e21771b546a1d7ce63db5143b92b1b87a90b`. Spec version: 2.4.
-SDK commit: `f461a0ee4c6e59f79966388ab07622eb61139cbe`; branch `codex/fix-conformance-certificate-profile`.
+SDK commit: `81125b7422df9d91937db38981de98cf03ea4ad9`; branch `codex/fix-conformance-certificate-profile`.
 
-**95 passed; 15 failed; 0 not applicable.**
+**94 passed; 16 failed; 0 not applicable.**
 
 Every case uses its specified signer/TSA trust anchors and historical validation time. Network fetches are disabled. Original YAML expectations are evaluated without filtering or remapping SDK statuses.
 
@@ -16,12 +16,11 @@ valid REVOKED OCSP response associated with intermediate CA cert
 - activeManifest.failures: missing ['signingCredential.untrusted']
 - activeManifest.successes: forbidden ['signingCredential.trusted']
 
-### ocsp/ocsp_skipped_expired_next_update.yaml
+### ocsp/ocsp_good.yaml
 
-OCSP expired against nextUpdate (skipped)
+valid GOOD OCSP response
 
-- activeManifest.successes: forbidden ['signingCredential.ocsp.notRevoked']
-- activeManifest.informationals: missing ['signingCredential.ocsp.skipped']
+- activeManifest.successes: missing ['signingCredential.ocsp.notRevoked']
 
 ### ocsp/ocsp_ts_before_this_update_ok.yaml
 
@@ -29,6 +28,12 @@ TS time before OCSP thisUpdate
 
 - activeManifest.successes: missing ['signingCredential.ocsp.notRevoked']
 - activeManifest.informationals: forbidden ['signingCredential.ocsp.skipped']
+
+### ocsp/ocsp_valid_at_ts_ok.yaml
+
+OCSP valid at TS time but expired at validation time
+
+- activeManifest.successes: missing ['signingCredential.ocsp.notRevoked']
 
 ### timestamps/bad_expired_late_ts.yaml
 
@@ -169,16 +174,16 @@ intermediate CA not yet valid (vTime 2005, CA valid 2010-2014)
 | `ingredients/opened_with_ingredient.yaml` | pass |
 | `ocsp/bad_ocsp_intermediate_revoked.yaml` | fail |
 | `ocsp/bad_ocsp_revoked.yaml` | pass |
-| `ocsp/ocsp_good.yaml` | pass |
+| `ocsp/ocsp_good.yaml` | fail |
 | `ocsp/ocsp_intermediate_good_leaf_missing.yaml` | pass |
 | `ocsp/ocsp_skipped_bad_sig.yaml` | pass |
-| `ocsp/ocsp_skipped_expired_next_update.yaml` | fail |
+| `ocsp/ocsp_skipped_expired_next_update.yaml` | pass |
 | `ocsp/ocsp_skipped_no_eku.yaml` | pass |
 | `ocsp/ocsp_skipped_unauthorized.yaml` | pass |
 | `ocsp/ocsp_skipped_validation_before_this_update.yaml` | pass |
 | `ocsp/ocsp_skipped_wrong_cert.yaml` | pass |
 | `ocsp/ocsp_ts_before_this_update_ok.yaml` | fail |
-| `ocsp/ocsp_valid_at_ts_ok.yaml` | pass |
+| `ocsp/ocsp_valid_at_ts_ok.yaml` | fail |
 | `signature/claim_signer_ca.yaml` | pass |
 | `signature/claim_signer_cert_expired.yaml` | pass |
 | `signature/claim_signer_cert_not_yet_valid.yaml` | pass |

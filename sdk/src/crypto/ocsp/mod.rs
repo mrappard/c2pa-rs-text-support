@@ -216,18 +216,15 @@ impl OcspResponse {
                     }
 
                     if !in_range {
-                        log_item!("", "certificate revoked", "check_ocsp_response")
-                            .validation_status(validation_codes::SIGNING_CREDENTIAL_REVOKED)
-                            .failure_no_throw(
-                                &mut internal_validation_log,
-                                OcspError::CertificateRevoked,
-                            );
+                        // A GOOD response outside its validity window is unusable,
+                        // but it is not evidence of revocation.
                     } else {
                         // As soon as we find one successful match, nothing else matters.
                         log_item!("", "certificate not revoked", "check_ocsp_response")
                             .validation_status(validation_codes::SIGNING_CREDENTIAL_NOT_REVOKED)
                             .success(&mut internal_validation_log);
 
+                        validation_log.append(&internal_validation_log);
                         return Ok(output);
                     }
                 }

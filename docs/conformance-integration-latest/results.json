@@ -2,12 +2,12 @@
   "suiteRevision": "9837e21771b546a1d7ce63db5143b92b1b87a90b",
   "specVersion": "2.4",
   "branch": "codex/fix-conformance-certificate-profile",
-  "sdkCommit": "f461a0ee4c6e59f79966388ab07622eb61139cbe",
+  "sdkCommit": "81125b7422df9d91937db38981de98cf03ea4ad9",
   "processClock": "/private/tmp/c2pa-conformance-clock.dylib",
   "networkFetch": false,
   "summary": {
-    "pass": 95,
-    "fail": 15,
+    "pass": 94,
+    "fail": 16,
     "not_applicable": 0
   },
   "cases": [
@@ -3764,15 +3764,16 @@
       "name": "ocsp/ocsp_good.yaml",
       "description": "valid GOOD OCSP response",
       "validationTime": "2013-06-01T00:00:00Z",
-      "outcome": "pass",
-      "issues": [],
+      "outcome": "fail",
+      "issues": [
+        "activeManifest.successes: missing ['signingCredential.ocsp.notRevoked']"
+      ],
       "observed": {
         "observedEpoch": 1370044800,
         "result": {
           "activeLabel": "urn:c2pa:ocsp_good",
           "active": {
             "successes": [
-              "signingCredential.ocsp.notRevoked",
               "signingCredential.trusted",
               "claimSignature.insideValidity",
               "claimSignature.validated",
@@ -3781,6 +3782,7 @@
               "assertion.dataHash.match"
             ],
             "informationals": [
+              "signingCredential.ocsp.skipped",
               "timeStamp.untrusted"
             ],
             "failures": []
@@ -3789,11 +3791,6 @@
           "validationDetails": {
             "activeManifest": {
               "success": [
-                {
-                  "code": "signingCredential.ocsp.notRevoked",
-                  "url": "self#jumbf=/c2pa/urn:c2pa:ocsp_good/c2pa.signature",
-                  "explanation": "signing cert not revoked: 66207627738045557425280896678116419259"
-                },
                 {
                   "code": "signingCredential.trusted",
                   "url": "self#jumbf=/c2pa/urn:c2pa:ocsp_good/c2pa.signature",
@@ -3826,6 +3823,11 @@
                 }
               ],
               "informational": [
+                {
+                  "code": "signingCredential.ocsp.skipped",
+                  "url": "self#jumbf=/c2pa/urn:c2pa:ocsp_good/c2pa.signature",
+                  "explanation": "OCSP validation skipped"
+                },
                 {
                   "code": "timeStamp.untrusted",
                   "url": "self#jumbf=/c2pa/urn:c2pa:ocsp_good/c2pa.signature",
@@ -4007,18 +4009,14 @@
       "name": "ocsp/ocsp_skipped_expired_next_update.yaml",
       "description": "OCSP expired against nextUpdate (skipped)",
       "validationTime": "2013-06-01T00:00:00Z",
-      "outcome": "fail",
-      "issues": [
-        "activeManifest.successes: forbidden ['signingCredential.ocsp.notRevoked']",
-        "activeManifest.informationals: missing ['signingCredential.ocsp.skipped']"
-      ],
+      "outcome": "pass",
+      "issues": [],
       "observed": {
         "observedEpoch": 1370044800,
         "result": {
           "activeLabel": "urn:c2pa:ocsp_expired_next_update",
           "active": {
             "successes": [
-              "signingCredential.ocsp.notRevoked",
               "signingCredential.trusted",
               "claimSignature.insideValidity",
               "claimSignature.validated",
@@ -4027,6 +4025,7 @@
               "assertion.dataHash.match"
             ],
             "informationals": [
+              "signingCredential.ocsp.skipped",
               "timeStamp.untrusted"
             ],
             "failures": []
@@ -4035,11 +4034,6 @@
           "validationDetails": {
             "activeManifest": {
               "success": [
-                {
-                  "code": "signingCredential.ocsp.notRevoked",
-                  "url": "self#jumbf=/c2pa/urn:c2pa:ocsp_expired_next_update/c2pa.signature",
-                  "explanation": "signing cert not revoked: 66207627738045557425280896678116419259"
-                },
                 {
                   "code": "signingCredential.trusted",
                   "url": "self#jumbf=/c2pa/urn:c2pa:ocsp_expired_next_update/c2pa.signature",
@@ -4072,6 +4066,11 @@
                 }
               ],
               "informational": [
+                {
+                  "code": "signingCredential.ocsp.skipped",
+                  "url": "self#jumbf=/c2pa/urn:c2pa:ocsp_expired_next_update/c2pa.signature",
+                  "explanation": "OCSP validation skipped"
+                },
                 {
                   "code": "timeStamp.untrusted",
                   "url": "self#jumbf=/c2pa/urn:c2pa:ocsp_expired_next_update/c2pa.signature",
@@ -4499,15 +4498,16 @@
       "name": "ocsp/ocsp_valid_at_ts_ok.yaml",
       "description": "OCSP valid at TS time but expired at validation time",
       "validationTime": "2013-06-01T00:00:00Z",
-      "outcome": "pass",
-      "issues": [],
+      "outcome": "fail",
+      "issues": [
+        "activeManifest.successes: missing ['signingCredential.ocsp.notRevoked']"
+      ],
       "observed": {
         "observedEpoch": 1370044800,
         "result": {
           "activeLabel": "urn:c2pa:ocsp_expired_at_vtime",
           "active": {
             "successes": [
-              "signingCredential.ocsp.notRevoked",
               "signingCredential.trusted",
               "claimSignature.insideValidity",
               "claimSignature.validated",
@@ -4516,6 +4516,7 @@
               "assertion.dataHash.match"
             ],
             "informationals": [
+              "signingCredential.ocsp.skipped",
               "timeStamp.untrusted"
             ],
             "failures": []
@@ -4524,11 +4525,6 @@
           "validationDetails": {
             "activeManifest": {
               "success": [
-                {
-                  "code": "signingCredential.ocsp.notRevoked",
-                  "url": "self#jumbf=/c2pa/urn:c2pa:ocsp_expired_at_vtime/c2pa.signature",
-                  "explanation": "signing cert not revoked: 66207627738045557425280896678116419259"
-                },
                 {
                   "code": "signingCredential.trusted",
                   "url": "self#jumbf=/c2pa/urn:c2pa:ocsp_expired_at_vtime/c2pa.signature",
@@ -4561,6 +4557,11 @@
                 }
               ],
               "informational": [
+                {
+                  "code": "signingCredential.ocsp.skipped",
+                  "url": "self#jumbf=/c2pa/urn:c2pa:ocsp_expired_at_vtime/c2pa.signature",
+                  "explanation": "OCSP validation skipped"
+                },
                 {
                   "code": "timeStamp.untrusted",
                   "url": "self#jumbf=/c2pa/urn:c2pa:ocsp_expired_at_vtime/c2pa.signature",
