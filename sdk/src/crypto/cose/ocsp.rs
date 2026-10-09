@@ -365,7 +365,24 @@ fn check_stapled_ocsp_response(
             let signing_time = tstinfo.gen_time.clone().into();
             (Some(tstinfo), Some(signing_time))
         }
-        Err(_) => (None, None),
+        Err(_) => {
+            // An otherwise valid timestamp can still be untrusted under the
+            // configured TSA list. Its generation time remains useful for
+            // evaluating the OCSP response's validity window.
+            let mut timestamp_log = StatusTracker::default();
+            let untrusted_time = if _sync {
+                validate_cose_tst_info(sign1, data, ctp, &mut timestamp_log, false)
+            } else {
+                validate_cose_tst_info_async(sign1, data, ctp, &mut timestamp_log, false).await
+            };
+            match untrusted_time {
+                Ok(tstinfo) => {
+                    let signing_time = tstinfo.gen_time.clone().into();
+                    (Some(tstinfo), Some(signing_time))
+                }
+                Err(_) => (None, None),
+            }
+        }
     };
 
     // The OCSP response must pertain to the certificate that signed this
