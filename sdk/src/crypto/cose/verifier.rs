@@ -144,6 +144,8 @@ impl Verifier<'_> {
                 .await
         }; // Ignore errors here - they have already been logged.
 
+        let trust_failed = result.is_err();
+
         // see if this trusted anchor set had custom EKU overrides
         let override_ekus = match result {
             // only case where we have named trust sets
@@ -161,13 +163,13 @@ impl Verifier<'_> {
         };
 
         // check the profile of the cert
-        if _sync {
+        let profile_result = if _sync {
             self.verify_profile(&sign1, tst_info, override_ekus, validation_log)
         } else {
             self.verify_profile_async(&sign1, tst_info, override_ekus, validation_log)
                 .await
-        }
-        .ok(); // Ignore errors here - they have already been logged.
+        };
+        let profile_failed = profile_result.is_err();
 
         // Reconstruct payload and additional data as it should have been at time of
         // signing.
@@ -225,6 +227,18 @@ impl Verifier<'_> {
             .last()
             .and_then(|attr| attr.ok())
             .map(|a| a.to_string());
+
+        if trust_failed {
+            return Err(CoseError::CertificateTrustError(
+                crate::crypto::cose::CertificateTrustError::CertificateNotTrusted,
+            ));
+        }
+        if profile_failed {
+            return Err(profile_result
+                .err()
+                .expect("profile failure was checked")
+                .into());
+        }
 
         Ok(CertificateInfo {
             alg: Some(alg),

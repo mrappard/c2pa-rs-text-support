@@ -156,8 +156,12 @@ pub fn check_ocsp_status(
         }
 
         // If the stapled response could not be validated and online fetching is disabled,
-        // return default without logging SIGNING_CREDENTIAL_OCSP_SKIPPED.
+        // report that OCSP validation was skipped. A malformed, expired, or otherwise
+        // unusable stapled response is not evidence that the certificate was good.
         if fetch_policy == OcspFetchPolicy::DoNotFetch {
+            log_item!("", "OCSP validation skipped", "check_ocsp_status")
+                .validation_status(SIGNING_CREDENTIAL_OCSP_SKIPPED)
+                .informational(validation_log);
             return Ok(OcspResponse::default());
         }
     }
