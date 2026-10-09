@@ -207,7 +207,7 @@ impl OcspResponse {
                         // If no signing time was provided, use current system time.
                         let now = time::utc_now().timestamp();
 
-                        now >= this_update && now <= next_update
+                        now >= this_update
                     };
 
                     if let Some(nu) = &single_response.next_update {
@@ -216,17 +216,18 @@ impl OcspResponse {
                     }
 
                     if !in_range {
-                        // A GOOD response outside its validity window is
-                        // unusable, but it is not evidence of revocation.
-                        // Leave the log empty so the caller can report OCSP
-                        // as skipped when fetching is disabled.
+                        log_item!("", "certificate revoked", "check_ocsp_response")
+                            .validation_status(validation_codes::SIGNING_CREDENTIAL_REVOKED)
+                            .failure_no_throw(
+                                &mut internal_validation_log,
+                                OcspError::CertificateRevoked,
+                            );
                     } else {
                         // As soon as we find one successful match, nothing else matters.
                         log_item!("", "certificate not revoked", "check_ocsp_response")
                             .validation_status(validation_codes::SIGNING_CREDENTIAL_NOT_REVOKED)
                             .success(&mut internal_validation_log);
 
-                        validation_log.append(&internal_validation_log);
                         return Ok(output);
                     }
                 }
@@ -370,51 +371,47 @@ fn cert_id_matches_signer(cert_id: &CertId, signing_cert_chain: &[Vec<u8>]) -> b
     // Both the end-entity certificate and its issuer are required to
     // reconstruct the certId: the serial number comes from the end-entity
     // certificate, and the issuer hashes come from the issuer certificate.
-    for pair in signing_cert_chain.windows(2) {
-        let subject_der = &pair[0];
-        let issuer_der = &pair[1];
-        let (Ok(subject), Ok(issuer)) = (
-            rasn::der::decode::<Certificate>(subject_der),
-            rasn::der::decode::<Certificate>(issuer_der),
-        ) else {
-            continue;
-        };
+    let (Some(subject_der), Some(issuer_der)) =
+        (signing_cert_chain.first(), signing_cert_chain.get(1))
+    else {
+        return false;
+    };
 
-        // serialNumber identifies the end-entity certificate.
-        if cert_id.serial_number != subject.tbs_certificate.serial_number {
-            continue;
-        }
+    let Ok(subject) = rasn::der::decode::<Certificate>(subject_der) else {
+        return false;
+    };
+    let Ok(issuer) = rasn::der::decode::<Certificate>(issuer_der) else {
+        return false;
+    };
 
-        // issuerNameHash and issuerKeyHash are computed over the issuer using the
-        // hash algorithm named in the response's certId (this matches how the OCSP
-        // request is constructed in `ocsp/fetch.rs`).
-        let Ok(issuer_name_raw) = rasn::der::encode(&issuer.tbs_certificate.subject) else {
-            continue;
-        };
-        let issuer_key_raw = issuer
-            .tbs_certificate
-            .subject_public_key_info
-            .subject_public_key
-            .as_raw_slice();
-
-        let Some(expected_name_hash) =
-            hash_by_oid(&cert_id.hash_algorithm.algorithm, &issuer_name_raw)
-        else {
-            continue;
-        };
-        let Some(expected_key_hash) =
-            hash_by_oid(&cert_id.hash_algorithm.algorithm, issuer_key_raw)
-        else {
-            continue;
-        };
-
-        if cert_id.issuer_name_hash.as_ref() == expected_name_hash.as_slice()
-            && cert_id.issuer_key_hash.as_ref() == expected_key_hash.as_slice()
-        {
-            return true;
-        }
+    // serialNumber identifies the end-entity certificate.
+    if cert_id.serial_number != subject.tbs_certificate.serial_number {
+        return false;
     }
-    false
+
+    // issuerNameHash and issuerKeyHash are computed over the issuer using the
+    // hash algorithm named in the response's certId (this matches how the OCSP
+    // request is constructed in `ocsp/fetch.rs`).
+    let Ok(issuer_name_raw) = rasn::der::encode(&issuer.tbs_certificate.subject) else {
+        return false;
+    };
+    let issuer_key_raw = issuer
+        .tbs_certificate
+        .subject_public_key_info
+        .subject_public_key
+        .as_raw_slice();
+
+    let Some(expected_name_hash) = hash_by_oid(&cert_id.hash_algorithm.algorithm, &issuer_name_raw)
+    else {
+        return false;
+    };
+    let Some(expected_key_hash) = hash_by_oid(&cert_id.hash_algorithm.algorithm, issuer_key_raw)
+    else {
+        return false;
+    };
+
+    cert_id.issuer_name_hash.as_ref() == expected_name_hash.as_slice()
+        && cert_id.issuer_key_hash.as_ref() == expected_key_hash.as_slice()
 }
 
 /// Hashes `data` with the digest algorithm identified by `alg`, or returns
