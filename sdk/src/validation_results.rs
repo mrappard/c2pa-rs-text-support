@@ -216,6 +216,22 @@ impl ValidationResults {
             .filter_map(ValidationStatus::from_log_item)
             .collect();
 
+        // A stapled OCSP response can be evaluated after certificate trust has
+        // already been recorded. Revocation is authoritative for that signing
+        // credential, so do not expose the earlier trusted success alongside
+        // an OCSP revoked failure.
+        let revoked_urls: std::collections::HashSet<_> = statuses
+            .iter()
+            .filter(|status| status.code() == validation_status::SIGNING_CREDENTIAL_REVOKED)
+            .filter_map(|status| status.url().map(str::to_owned))
+            .collect();
+        statuses.retain(|status| {
+            if status.code() != validation_status::SIGNING_CREDENTIAL_TRUSTED {
+                return true;
+            }
+            !status.url().is_some_and(|url| revoked_urls.contains(url))
+        });
+
         // Find out the trust list URI for trusted signing credentials or TSA
         for status in &statuses {
             if status.code() == validation_status::SIGNING_CREDENTIAL_TRUSTED {

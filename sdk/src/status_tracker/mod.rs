@@ -52,6 +52,12 @@ impl StatusTracker {
         &mut self.logged_items
     }
 
+    /// Removes all entries carrying the supplied validation status code.
+    pub(crate) fn remove_status(&mut self, code: &str) {
+        self.logged_items
+            .retain(|item| item.validation_status.as_deref() != Some(code));
+    }
+
     /// Appends the contents of another [`StatusTracker`] to this list of
     /// validation log items.
     pub fn append(&mut self, other: &StatusTracker) {
