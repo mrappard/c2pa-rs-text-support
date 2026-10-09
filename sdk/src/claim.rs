@@ -329,6 +329,9 @@ pub struct Claim {
     ingredients_list: Vec<String>,
 
     signature_val: Vec<u8>, // the signature of the loaded/saved claim
+    // Actual description label read from the signature box. New claims have no
+    // loaded box yet and use the canonical label when generating JUMBF.
+    signature_box_label: Option<String>,
 
     // root of CAI store
     #[allow(dead_code)]
@@ -526,6 +529,7 @@ impl Claim {
             remote_manifest: RemoteManifest::NoRemote,
             root: jumbf::labels::MANIFEST_STORE.to_string(),
             signature_val: Vec::new(),
+            signature_box_label: None,
             ingredients_store: HashMap::new(),
             ingredients_list: Vec::new(),
             label: l,
@@ -628,6 +632,7 @@ impl Claim {
             remote_manifest: RemoteManifest::NoRemote,
             root: jumbf::labels::MANIFEST_STORE.to_string(),
             signature_val: Vec::new(),
+            signature_box_label: None,
             ingredients_store: HashMap::new(),
             ingredients_list: Vec::new(),
             label,
@@ -778,6 +783,7 @@ impl Claim {
                 ingredients_store: HashMap::new(),
                 ingredients_list: Vec::new(),
                 signature_val: Vec::new(),
+                signature_box_label: None,
                 root: jumbf::labels::MANIFEST_STORE.to_string(),
                 label: label.to_string(),
                 conflict_label: None,
@@ -862,6 +868,7 @@ impl Claim {
                 ingredients_store: HashMap::new(),
                 ingredients_list: Vec::new(),
                 signature_val: Vec::new(),
+                signature_box_label: None,
                 root: jumbf::labels::MANIFEST_STORE.to_string(),
                 label: label.to_string(),
                 conflict_label: None,
@@ -1151,6 +1158,10 @@ impl Claim {
     fn add_signature_box_link(&mut self) {
         // full path to signature box
         self.signature = self.signature_uri();
+    }
+
+    pub(crate) fn set_signature_box_label(&mut self, label: String) {
+        self.signature_box_label = Some(label);
     }
 
     ///  set signature of the claim
@@ -2093,15 +2104,11 @@ impl Claim {
             } // relative signature box
         };
 
-        if sig_box_err {
-            log_item!(
-                to_signature_uri(claim.label()),
-                "signature missing",
-                "verify_claim"
-            )
-            .validation_status(validation_status::CLAIM_SIGNATURE_MISSING)
-            .failure(validation_log, Error::ClaimMissingSignatureBox)?;
-        }
+        let sig_box_err = sig_box_err
+            || claim
+                .signature_box_label
+                .as_deref()
+                .is_some_and(|label| label != jumbf::labels::SIGNATURE);
 
         // for V2 and greater claims the label must conform
         if claim.version() > 1 && manifest_label_to_parts(claim.label()).is_none() {
@@ -2112,6 +2119,27 @@ impl Claim {
             )
             .validation_status(validation_status::CLAIM_MALFORMED)
             .failure(validation_log, Error::ClaimInvalidContent)?;
+        }
+
+        if sig_box_err {
+            log_item!(
+                to_signature_uri(claim.label()),
+                "signature missing",
+                "verify_claim"
+            )
+            .validation_status(validation_status::CLAIM_SIGNATURE_MISSING)
+            .failure(validation_log, Error::ClaimMissingSignatureBox)?;
+            // A signature at a different label cannot authenticate this claim.
+            // Continue assertion checks without parsing or verifying that COSE data.
+            let result = Claim::verify_internal(
+                claim,
+                svi,
+                Err(Error::ClaimMissingSignatureBox),
+                validation_log,
+                context,
+            );
+            validation_log.pop_current_uri();
+            return result;
         }
 
         // If we are validating a claim that has been loaded from a file
@@ -3655,6 +3683,8 @@ impl Claim {
                     .success(validation_log);
                 }
             }
+            // Resolution already reported missing; it is not a signature mismatch.
+            Err(Error::ClaimMissingSignatureBox) => {}
             Err(parse_err) => {
                 // handle case where lower level failed to log
                 log_item!(
