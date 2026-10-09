@@ -1,0 +1,127 @@
+[
+  {
+    "ref": "fix/zip-deflate-entries",
+    "commit": "56e2484d8f9c60b847c060d8db5516869fa972de",
+    "included": true
+  },
+  {
+    "ref": "fix/zip-opc-content-type",
+    "commit": "dfe0eac4ebd5d99ef61cc1f2ae2c304ec8158530",
+    "included": true
+  },
+  {
+    "ref": "feat/ppsx",
+    "commit": "694ca7b9f27e0f058e9f728e82a59fc04915527d",
+    "included": true
+  },
+  {
+    "ref": "feat/csv-tsv-sidecar",
+    "commit": "db2c98f0f567a0a55b81f7a7a24b862ce7cd8458",
+    "included": true
+  },
+  {
+    "ref": "fix/versioned-assertion-labels",
+    "commit": "18693d0f605de4fa1f71a45d97eb42752f6f3a6c",
+    "included": true
+  },
+  {
+    "ref": "feat/asset-type-v2",
+    "commit": "adfb241690b0a2c6001eb1ee58c8aec7b4894be6",
+    "included": true
+  },
+  {
+    "ref": "feat/font-sfnt",
+    "commit": "c0ac25656df467ac0271e6fa409d76fbcda8955a",
+    "included": true
+  },
+  {
+    "ref": "feat/safetensors",
+    "commit": "adf1c2cbaade57cd023e8dab847101cc37f3eb2c",
+    "included": true
+  },
+  {
+    "ref": "feat/onnx",
+    "commit": "1a1580421b3c6e4c48787da21d20edd6b0d3cb3a",
+    "included": true
+  },
+  {
+    "ref": "feat/parquet",
+    "commit": "ff4e4c2fdfd6d4b1c7a638e211c8fd3b97325e05",
+    "included": true
+  },
+  {
+    "ref": "feat/heif-sequence",
+    "commit": "7a939a7b8ed3f061aae25c0dcce349b0ee3bb628",
+    "included": true
+  },
+  {
+    "ref": "feat/keras",
+    "commit": "7fe9397d91bfbfec456fb2c1868f8d1282709842",
+    "included": true
+  },
+  {
+    "ref": "fix/tiff-resign",
+    "commit": "0e00b74d07613c9dff5982a1ced5418a0b73e367",
+    "included": true
+  },
+  {
+    "ref": "fix/id3-frame-sizes",
+    "commit": "6304a74fbbae5b265763f8cac186fe3998fbc5c3",
+    "included": true
+  },
+  {
+    "ref": "origin/feat/text-support",
+    "commit": "2dd7054a014d948e45fce29f5cb0080f84413fe0",
+    "included": true
+  },
+  {
+    "ref": "origin/feat/midi-support",
+    "commit": "4663066df7b5436cae210628038b00f20354778e",
+    "included": true
+  },
+  {
+    "ref": "codex/fix-signer-validity-status",
+    "commit": "3eb6dec7cfb437d4b4f9bc3f2dc4322c85f403f4",
+    "included": true
+  },
+  {
+    "ref": "codex/fix-riff-data-hash-exclusions",
+    "commit": "660abaf035d1400fef1be1d79683073a3dbf5fe6",
+    "included": true
+  },
+  {
+    "ref": "codex/fix-rejected-hard-binding",
+    "commit": "9e7cd03b5d54776e763845ec551fd1887d5c2ab3",
+    "included": true
+  },
+  {
+    "ref": "codex/fix-signature-box-label",
+    "commit": "4c7d18d62f76c4aa3a0c1e1a565c869fa863714e",
+    "included": true
+  },
+  {
+    "ref": "codex/fix-unsupported-hash-algorithm",
+    "commit": "34fc58202f1c10157f5d487a1968931f6256b68f",
+    "included": true
+  },
+  {
+    "ref": "codex/fix-collection-hash-uris-array",
+    "commit": "fbc9d0db9bcc7486e9c49bdbff0566219dc535cb",
+    "included": true
+  },
+  {
+    "ref": "codex/fix-malformed-v3-ingredients",
+    "commit": "68c48f2d42ba9b70ec494d162a119acfc2f1419d",
+    "included": true
+  },
+  {
+    "ref": "codex/validate-multi-asset-jpeg",
+    "commit": "029653678f5d7d68d347d671951a7a9c39608a57",
+    "included": true
+  },
+  {
+    "ref": "codex/report-structural-validation-status",
+    "commit": "572f7715519c0038c634d6e0353905507d2ca095",
+    "included": true
+  }
+]

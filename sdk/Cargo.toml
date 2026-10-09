@@ -318,3 +318,7 @@ harness = false
 [[bench]]
 name = "settings_memory"
 harness = false
+
+[[example]]
+name = "conformance_validate"
+required-features = ["file_io"]

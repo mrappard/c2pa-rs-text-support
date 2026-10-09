@@ -3374,11 +3374,13 @@ impl Claim {
                             Err(e) => {
                                 if matches!(e, Error::HashMismatch(_))
                                     && dh.exclusions.as_ref().is_none_or(|ranges| {
-                                        data_hash_exclusions_match_manifest(
-                                            ranges,
-                                            svi.manifest_store_range.as_ref(),
-                                            svi.is_embedded,
-                                        )
+                                        plain_text.is_some()
+                                            || data_hash_exclusions_match_manifest(
+                                                ranges,
+                                                svi.manifest_store_range.as_ref(),
+                                                svi.is_embedded,
+                                                asset_data.format().as_deref(),
+                                            )
                                     })
                                     && hash_assertions_len == 1
                                     && claim.verify_multi_asset_fallback(
