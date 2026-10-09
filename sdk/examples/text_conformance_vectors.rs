@@ -2,6 +2,10 @@
 // structured text assets, broken variants of them, and the crJSON a validator produces
 // for each (or the error when the asset is rejected before a manifest can be read).
 //
+// Every vector follows the published Spec 2.4. Unstructured text is signed with the 2.4
+// C2PATextManifestWrapper, which has no padding (see sign_text_2_4), and no vector depends
+// on behaviour added in later drafts.
+//
 // Usage: cargo run --example text_conformance_vectors --features "file_io spec_2_4_text" -- <output dir>
 
 use std::{
@@ -11,7 +15,7 @@ use std::{
 };
 
 use anyhow::{Context as _, Result};
-use c2pa::{create_signer, Builder, Context, Reader, SigningAlg};
+use c2pa::{assertions::DataHash, create_signer, Builder, Context, HashRange, Reader, Signer, SigningAlg};
 use serde_json::{json, Value};
 
 const SIGNCERT: &[u8] = include_bytes!("../tests/fixtures/certs/es256.pub");
@@ -22,7 +26,6 @@ const HUMAN_WRITTEN: &str = "http://cv.iptc.org/newscodes/digitalsourcetype/digi
 const HTML_DOC: &str = "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>Example</title>\n</head>\n<body>\n<p>Content here.</p>\n</body>\n</html>\n";
 const TXT_DOC: &str = "The quick brown fox jumps over the lazy dog.\nSecond line.\n";
 const CSV_DOC: &str = "name,city\nAda,London\nGrace,New York\n";
-const TSV_DOC: &str = "name\tcity\nAda\tLondon\nGrace\tNew York\n";
 const MD_DOC: &str = "# Title\n\nSome markdown text.\n";
 
 struct Case {
@@ -66,20 +69,82 @@ fn sign(format: &str, content: &[u8]) -> Result<Vec<u8>> {
     Ok(sign_with(&mut builder, format, content)?.0)
 }
 
-/// Signs an edit of an already signed asset: the original becomes the parentOf
-/// ingredient and the first action is c2pa.opened.
-fn sign_edit(format: &str, original: &[u8], edited_text: &[u8]) -> Result<Vec<u8>> {
-    let mut builder = Builder::from_context(Context::new())
-        .with_definition(definition(json!([
-            { "action": "c2pa.opened", "parameters": { "ingredientIds": ["original"] } },
-            { "action": "c2pa.edited", "digitalSourceType": HUMAN_WRITTEN }
-        ])))?;
+fn edit_actions() -> Value {
+    json!([
+        { "action": "c2pa.opened", "parameters": { "ingredientIds": ["original"] } },
+        { "action": "c2pa.edited", "digitalSourceType": HUMAN_WRITTEN }
+    ])
+}
+
+/// Makes `original` the parentOf ingredient of an edit (first action c2pa.opened).
+fn add_original(builder: &mut Builder, format: &str, original: &[u8]) -> Result<()> {
     builder.add_ingredient_from_stream(
         json!({ "title": "original", "relationship": "parentOf", "label": "original" }).to_string(),
         format,
         &mut Cursor::new(original.to_vec()),
     )?;
-    Ok(sign_with(&mut builder, format, edited_text)?.0)
+    Ok(())
+}
+
+/// The Spec 2.4 C2PATextManifestWrapper (§A.8.2, §A.8.3): U+FEFF, then the magic, version,
+/// length and manifest store, each byte encoded as a variation selector. 2.4 has no padding.
+fn wrapper_2_4(store: &[u8]) -> Result<String> {
+    let mut framed = b"C2PATXT\0".to_vec();
+    framed.push(1);
+    framed.extend_from_slice(&u32::try_from(store.len())?.to_be_bytes());
+    framed.extend_from_slice(store);
+    let mut out = String::from('\u{FEFF}');
+    for b in framed {
+        let cp = if b <= 15 { 0xFE00 + b as u32 } else { 0xE0100 + (b as u32 - 16) };
+        out.push(char::from_u32(cp).context("variation selector")?);
+    }
+    Ok(out)
+}
+
+/// Gives up if the wrapper length and the signed exclusion never agree. Each attempt agrees
+/// with a probability of roughly one in six, so this is never reached in practice.
+const MAX_SIGNING_ATTEMPTS: usize = 500;
+
+/// Signs unstructured text with a Spec 2.4 wrapper appended after `visible`.
+///
+/// The exclusion in c2pa.hash.data must cover exactly the wrapper (§A.8.6.1, §A.8.7.3), but
+/// the wrapper's UTF-8 length depends on the signed bytes: bytes 0-15 take 3 bytes and the
+/// rest take 4. The 2.4 wrapper has no padding to absorb the difference, so this signs with a
+/// guessed exclusion length and re-signs with the measured length until the two agree. The
+/// data hash covers only `visible`, so it is the same on every attempt.
+///
+/// `visible` must already be NFC (the vectors use ASCII), since 2.4 measures offsets in the
+/// NFC-normalized text.
+fn sign_text_2_4(actions: Value, original: Option<(&str, &[u8])>, visible: &str) -> Result<Vec<u8>> {
+    let signer = create_signer::from_keys(SIGNCERT, PKEY, SigningAlg::Es256, None)?;
+    let start = visible.len() as u64;
+    let mut exclusion_len = None;
+    for _ in 0..MAX_SIGNING_ATTEMPTS {
+        let mut builder = Builder::from_context(Context::new()).with_definition(definition(actions.clone()))?;
+        if let Some((format, bytes)) = original {
+            add_original(&mut builder, format, bytes)?;
+        }
+        // "c2pa" yields the raw manifest store, which is wrapped here rather than by a handler
+        let placeholder = builder.data_hashed_placeholder(signer.reserve_size(), "c2pa")?;
+        let guess = match exclusion_len {
+            Some(len) => len,
+            None => wrapper_2_4(&placeholder)?.len() as u64,
+        };
+
+        let mut dh = DataHash::new("jumbf manifest", "sha256");
+        dh.add_exclusion(HashRange::new(start, guess));
+        let mut hashed = visible.as_bytes().to_vec();
+        hashed.resize((start + guess) as usize, 0);
+        dh.gen_hash_from_stream(&mut Cursor::new(hashed))?;
+
+        let store = builder.sign_data_hashed_embeddable(signer.as_ref(), &dh, "c2pa")?;
+        let wrapper = wrapper_2_4(&store)?;
+        if wrapper.len() as u64 == guess {
+            return Ok(format!("{visible}{wrapper}").into_bytes());
+        }
+        exclusion_len = Some(wrapper.len() as u64);
+    }
+    anyhow::bail!("the wrapper length did not converge after {MAX_SIGNING_ATTEMPTS} signing attempts")
 }
 
 fn replace_once(asset: &[u8], from: &[u8], to: &[u8]) -> Vec<u8> {
@@ -105,7 +170,7 @@ fn cases() -> Result<Vec<Case>> {
     };
 
     // Unstructured text (Spec 2.4 §A.8)
-    let txt = sign("txt", TXT_DOC.as_bytes())?;
+    let txt = sign_text_2_4(created(), None, TXT_DOC)?;
     add("txt-valid", "txt", "text/plain", "Signed plain text; wrapper at the end of the text.", txt.clone(), None);
     add("txt-tampered", "txt", "text/plain", "One word changed after signing; the wrapper still matches the exclusion.", replace_once(&txt, b"quick", b"quack"), None);
     add(
@@ -116,29 +181,23 @@ fn cases() -> Result<Vec<Case>> {
         replace_once(&txt, b"Second line.", b"Second line, edited."),
         None,
     );
-    let nfc = sign("txt", "Caf\u{00E9} au lait.\n".as_bytes())?;
-    let nfd = replace_once(&nfc, "Caf\u{00E9}".as_bytes(), "Cafe\u{0301}".as_bytes());
-    add("txt-nfd-after-signing", "txt", "text/plain", "Signed as NFC, then stored as NFD (same text, different bytes, exclusion moved). NFD is not tampering, but the exclusion no longer matches the wrapper.", nfd, None);
     let mut two = txt.clone();
     two.extend_from_slice(&txt[wrapper_start(&txt)..]);
     add("txt-two-wrappers", "txt", "text/plain", "The wrapper is duplicated (manifest.text.multipleWrappers).", two, None);
     let start = wrapper_start(&txt);
     add("txt-truncated-wrapper", "txt", "text/plain", "Partial copy: the wrapper is cut off after its header (manifest.text.corruptedWrapper).", txt[..start + 3 + 40 * 4].to_vec(), None);
-    add("txt-edited", "txt", "text/plain", "An edit of txt-valid: first action c2pa.opened with txt-valid as the parentOf ingredient.", sign_edit("txt", &txt, b"The quick brown fox jumps over the lazy cat.\n")?, None);
-    let csv = sign("csv", CSV_DOC.as_bytes())?;
+    add(
+        "txt-edited",
+        "txt",
+        "text/plain",
+        "An edit of txt-valid: first action c2pa.opened with txt-valid as the parentOf ingredient.",
+        sign_text_2_4(edit_actions(), Some(("txt", &txt)), "The quick brown fox jumps over the lazy cat.\n")?,
+        None,
+    );
+    let csv = sign_text_2_4(created(), None, CSV_DOC)?;
     add("csv-valid", "csv", "text/csv", "Signed CSV using the unstructured text wrapper.", csv, None);
-    // Later drafts require an external manifest covering the complete file for CSV and TSV,
-    // whose record grammar has no place for a manifest.
-    for (name, ext, media_type, doc) in [
-        ("csv-sidecar", "csv", "text/csv", CSV_DOC),
-        ("tsv-sidecar", "tsv", "text/tab-separated-values", TSV_DOC),
-    ] {
-        let mut builder = Builder::from_context(Context::new()).with_definition(definition(created()))?;
-        builder.set_no_embed(true);
-        let (asset, manifest) = sign_with(&mut builder, ext, doc.as_bytes())?;
-        assert_eq!(asset, doc.as_bytes(), "{name}: a sidecar-signed asset is left unchanged");
-        add(name, ext, media_type, "Unchanged file with an external manifest (sidecar) whose data hash covers the complete file and has no exclusions. Validated from the .c2pa sidecar.", asset, Some(manifest));
-    }
+    // The CSV and TSV sidecar cases (external manifest covering the complete file) are left
+    // out: that handling comes from a later draft, not from Spec 2.4.
 
     // HTML (Spec 2.4 §A.7)
     let html = sign("html", HTML_DOC.as_bytes())?;
