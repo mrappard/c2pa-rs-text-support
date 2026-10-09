@@ -1,0 +1,24 @@
+{
+  "unit": {
+    "passed": 1442,
+    "failed": 4,
+    "ignored": 15,
+    "failures": [
+      "reader::tests::read_zip_signed_on_linux",
+      "reader::tests::read_zip_signed_on_macos",
+      "reader::tests::read_zip_signed_with_backslash_paths_on_windows",
+      "reader::tests::read_zip_signed_with_normalized_paths_on_windows"
+    ],
+    "reason": "Legacy signed ZIP fixtures use the old uris map; corrected deserializer requires the specification array."
+  },
+  "integration": {
+    "passed": 140,
+    "failed": 0,
+    "ignored": 1,
+    "targets": 16
+  },
+  "all_features_check": "passed",
+  "all_features_clippy": "passed",
+  "format": "passed",
+  "diff_check": "passed"
+}
