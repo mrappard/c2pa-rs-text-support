@@ -1,0 +1,110 @@
+{
+  "suiteRevision": "9837e21771b546a1d7ce63db5143b92b1b87a90b",
+  "specVersion": "2.4",
+  "branch": "codex/fix-conformance-certificate-profile",
+  "sdkCommit": "219f0a0609fa6f6e0db16bbfc3bbf9cf98aa4165",
+  "processClock": "/private/tmp/c2pa-conformance-clock.dylib",
+  "networkFetch": false,
+  "summary": {
+    "pass": 1,
+    "fail": 0,
+    "not_applicable": 0
+  },
+  "cases": [
+    {
+      "name": "assertions/malformed_assertion.yaml",
+      "description": "assertion CBOR is malformed (assertion.cbor.invalid)",
+      "validationTime": "2001-06-01T00:00:00Z",
+      "outcome": "pass",
+      "issues": [],
+      "observed": {
+        "observedEpoch": 991353600,
+        "result": {
+          "activeLabel": "urn:c2pa:malformed_assertion",
+          "active": {
+            "successes": [
+              "signingCredential.trusted",
+              "claimSignature.insideValidity",
+              "claimSignature.validated",
+              "assertion.hashedURI.match",
+              "assertion.hashedURI.match",
+              "assertion.dataHash.match"
+            ],
+            "informationals": [
+              "signingCredential.ocsp.skipped"
+            ],
+            "failures": [
+              "assertion.cbor.invalid",
+              "assertion.action.malformed",
+              "assertion.required.missing"
+            ]
+          },
+          "ingredients": [],
+          "validationDetails": {
+            "activeManifest": {
+              "success": [
+                {
+                  "code": "signingCredential.trusted",
+                  "url": "self#jumbf=/c2pa/urn:c2pa:malformed_assertion/c2pa.signature",
+                  "explanation": "signing certificate trusted, found in [https://c2pa-rs/unknown_trust_list_eeec9254f164ae8306acef995bf769b3c0d5c308f3ae9ea9ef1a41f47b364439] trust anchors"
+                },
+                {
+                  "code": "claimSignature.insideValidity",
+                  "url": "self#jumbf=/c2pa/urn:c2pa:malformed_assertion/c2pa.signature",
+                  "explanation": "claim signature valid"
+                },
+                {
+                  "code": "claimSignature.validated",
+                  "url": "self#jumbf=/c2pa/urn:c2pa:malformed_assertion/c2pa.signature",
+                  "explanation": "claim signature valid"
+                },
+                {
+                  "code": "assertion.hashedURI.match",
+                  "url": "self#jumbf=/c2pa/urn:c2pa:malformed_assertion/c2pa.assertions/c2pa.actions.v2",
+                  "explanation": "hashed uri matched: self#jumbf=c2pa.assertions/c2pa.actions.v2"
+                },
+                {
+                  "code": "assertion.hashedURI.match",
+                  "url": "self#jumbf=/c2pa/urn:c2pa:malformed_assertion/c2pa.assertions/c2pa.hash.data",
+                  "explanation": "hashed uri matched: self#jumbf=c2pa.assertions/c2pa.hash.data"
+                },
+                {
+                  "code": "assertion.dataHash.match",
+                  "url": "self#jumbf=/c2pa/urn:c2pa:malformed_assertion/c2pa.assertions/c2pa.hash.data",
+                  "explanation": "data hash valid"
+                }
+              ],
+              "informational": [
+                {
+                  "code": "signingCredential.ocsp.skipped",
+                  "url": "self#jumbf=/c2pa/urn:c2pa:malformed_assertion/c2pa.signature",
+                  "explanation": "OCSP fetching skipped"
+                }
+              ],
+              "failure": [
+                {
+                  "code": "assertion.cbor.invalid",
+                  "url": "c2pa.actions.v2",
+                  "explanation": "invalid assertion cbor"
+                },
+                {
+                  "code": "assertion.action.malformed",
+                  "url": "urn:c2pa:malformed_assertion",
+                  "explanation": "first action must be created or opened"
+                },
+                {
+                  "code": "assertion.required.missing",
+                  "url": "self#jumbf=/c2pa/urn:c2pa:malformed_assertion",
+                  "explanation": "Failed to load manifest"
+                }
+              ]
+            },
+            "specVersion": "2.4.0",
+            "trustListUri": "https://c2pa-rs/unknown_trust_list_eeec9254f164ae8306acef995bf769b3c0d5c308f3ae9ea9ef1a41f47b364439"
+          },
+          "deltas": null
+        }
+      }
+    }
+  ]
+}

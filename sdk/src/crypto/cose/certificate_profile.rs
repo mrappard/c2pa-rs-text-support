@@ -529,7 +529,18 @@ pub fn check_certificate_profile(
     ski_good = if tbscert.is_ca() { ski_good } else { true };
 
     // Check all flags.
-    if aki_good && ski_good && key_usage_good && extended_key_usage_good && handled_all_critical {
+    // AuthorityKeyIdentifier is required for CA certificates, but it is not
+    // required on an end-entity signing certificate. The conformance signer
+    // certificates intentionally omit it, and RFC 5280 does not make it a
+    // mandatory end-entity extension.
+    let authority_key_identifier_good = !tbscert.is_ca() || aki_good;
+
+    if authority_key_identifier_good
+        && ski_good
+        && key_usage_good
+        && extended_key_usage_good
+        && handled_all_critical
+    {
         Ok(())
     } else {
         log_item!(

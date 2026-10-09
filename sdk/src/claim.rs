@@ -2353,7 +2353,9 @@ impl Claim {
         // starting with 2.4 these assertion can only be in created assertions
         for actions in [&created_actions, &gathered_actions] {
             if let Some(assertion) = actions.first() {
-                let first_actions = Actions::from_assertion(assertion.assertion())?;
+                let Ok(first_actions) = Actions::from_assertion(assertion.assertion()) else {
+                    continue;
+                };
                 let first_actions_first_action = &first_actions.actions().first();
 
                 if let Some(first_actions_first_action) = first_actions_first_action {
@@ -2415,7 +2417,9 @@ impl Claim {
 
         // perform all actions checks
         for actions_assertion in all_actions.iter() {
-            let actions = Actions::from_assertion(actions_assertion.assertion())?;
+            let Ok(actions) = Actions::from_assertion(actions_assertion.assertion()) else {
+                continue;
+            };
             let label = to_assertion_uri(claim.label(), &actions_assertion.label());
 
             // 1. Actions must have actions array

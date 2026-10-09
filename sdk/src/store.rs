@@ -915,12 +915,12 @@ impl Store {
                         "get_assertion_from_jumbf_store"
                     )
                     .validation_status(ASSERTION_JSON_INVALID)
-                    .failure(
+                    .failure_no_throw(
                         validation_log,
                         Error::AssertionDecoding(
                             AssertionDecodeError::from_assertion_and_json_err(&assertion, e),
                         ),
-                    )?;
+                    );
                 }
 
                 let hash = Claim::calc_assertion_box_hash(&label, &assertion, salt.clone(), &alg)?;
@@ -967,12 +967,12 @@ impl Store {
                         "get_assertion_from_jumbf_store"
                     )
                     .validation_status(ASSERTION_CBOR_INVALID)
-                    .failure(
+                    .failure_no_throw(
                         validation_log,
                         Error::AssertionDecoding(
                             AssertionDecodeError::from_assertion_and_cbor_err(&assertion, e),
                         ),
-                    )?;
+                    );
                 }
 
                 let hash = Claim::calc_assertion_box_hash(&label, &assertion, salt.clone(), &alg)?;
