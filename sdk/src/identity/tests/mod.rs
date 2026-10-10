@@ -16,6 +16,8 @@
 #![allow(clippy::unwrap_used)]
 
 mod claim_aggregation;
+#[cfg(all(not(target_arch = "wasm32"), feature = "openssl"))]
+mod conformance_fixtures;
 #[cfg(not(target_arch = "wasm32"))]
 mod embeddable_signing;
 mod examples;

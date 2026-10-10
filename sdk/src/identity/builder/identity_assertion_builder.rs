@@ -36,10 +36,32 @@ use crate::{
 /// [`CredentialHolder`] implementation.
 ///
 /// [`IdentityAssertionSigner`]: crate::identity::builder::IdentityAssertionSigner
+/// Test-only hooks for deliberately producing non-conformant identity
+/// assertions (used to generate conformance test fixtures).
+///
+/// `signer_payload` runs after the signer payload is assembled and before it is
+/// presented to the credential holder for signature. `identity_assertion` runs
+/// on the fully padded assertion just before its final serialization; it must
+/// not change the serialized size.
+#[cfg(test)]
+#[derive(Clone, Default)]
+pub(crate) struct BuilderTestHooks {
+    pub(crate) signer_payload: Option<SignerPayloadHook>,
+    pub(crate) identity_assertion: Option<IdentityAssertionHook>,
+}
+
+#[cfg(test)]
+pub(crate) type SignerPayloadHook = Arc<dyn Fn(&mut SignerPayload) + Send + Sync>;
+
+#[cfg(test)]
+pub(crate) type IdentityAssertionHook = Arc<dyn Fn(&mut IdentityAssertion) + Send + Sync>;
+
 pub struct IdentityAssertionBuilder {
     credential_holder: Box<dyn CredentialHolder + Sync + Send>,
     referenced_assertions: HashSet<String>,
     roles: Vec<String>,
+    #[cfg(test)]
+    pub(crate) test_hooks: BuilderTestHooks,
 }
 
 impl IdentityAssertionBuilder {
@@ -52,6 +74,8 @@ impl IdentityAssertionBuilder {
             credential_holder: Box::new(credential_holder),
             referenced_assertions: HashSet::new(),
             roles: vec![],
+            #[cfg(test)]
+            test_hooks: BuilderTestHooks::default(),
         }
     }
 
@@ -116,15 +140,27 @@ impl DynamicAssertion for IdentityAssertionBuilder {
             .cloned()
             .collect();
 
-        let signer_payload = SignerPayload {
+        #[allow(unused_mut)]
+        let mut signer_payload = SignerPayload {
             referenced_assertions,
             sig_type: self.credential_holder.sig_type().to_owned(),
             roles: self.roles.clone(),
         };
 
+        #[cfg(test)]
+        if let Some(hook) = &self.test_hooks.signer_payload {
+            hook(&mut signer_payload);
+        }
+
         let signature_result = self.credential_holder.sign(&signer_payload);
 
-        finalize_identity_assertion(signer_payload, size, signature_result)
+        finalize_identity_assertion(
+            signer_payload,
+            size,
+            signature_result,
+            #[cfg(test)]
+            &self.test_hooks,
+        )
     }
 }
 
@@ -171,6 +207,8 @@ pub struct AsyncIdentityAssertionBuilder {
 
     referenced_assertions: HashSet<String>,
     roles: Vec<String>,
+    #[cfg(test)]
+    pub(crate) test_hooks: BuilderTestHooks,
 }
 
 // SAFETY: On wasm32, there is no threading, so Send is trivially safe
@@ -187,6 +225,8 @@ impl AsyncIdentityAssertionBuilder {
             credential_holder: Box::new(credential_holder),
             referenced_assertions: HashSet::new(),
             roles: vec![],
+            #[cfg(test)]
+            test_hooks: BuilderTestHooks::default(),
         }
     }
 
@@ -253,15 +293,27 @@ impl AsyncDynamicAssertion for AsyncIdentityAssertionBuilder {
             .cloned()
             .collect();
 
-        let signer_payload = SignerPayload {
+        #[allow(unused_mut)]
+        let mut signer_payload = SignerPayload {
             referenced_assertions,
             sig_type: self.credential_holder.sig_type().to_owned(),
             roles: self.roles.clone(),
         };
 
+        #[cfg(test)]
+        if let Some(hook) = &self.test_hooks.signer_payload {
+            hook(&mut signer_payload);
+        }
+
         let signature_result = self.credential_holder.sign(&signer_payload).await;
 
-        finalize_identity_assertion(signer_payload, size, signature_result)
+        finalize_identity_assertion(
+            signer_payload,
+            size,
+            signature_result,
+            #[cfg(test)]
+            &self.test_hooks,
+        )
     }
 }
 
@@ -298,6 +350,7 @@ fn finalize_identity_assertion(
     signer_payload: SignerPayload,
     size: Option<usize>,
     signature_result: Result<Vec<u8>, IdentityBuilderError>,
+    #[cfg(test)] test_hooks: &BuilderTestHooks,
 ) -> crate::Result<DynamicAssertionContent> {
     // TO DO: Think through how errors map into crate::Error.
     let signature = signature_result.map_err(|e| crate::Error::BadParam(e.to_string()))?;
@@ -349,6 +402,21 @@ fn finalize_identity_assertion(
         if assertion_cbor.len() != assertion_size {
             return Err(crate::Error::BadParam(format!(
                 "Padded assertion is {len} bytes, expected {assertion_size} bytes",
+                len = assertion_cbor.len()
+            )));
+        }
+    }
+
+    #[cfg(test)]
+    if let Some(hook) = &test_hooks.identity_assertion {
+        let expected_len = assertion_cbor.len();
+        hook(&mut ia);
+        assertion_cbor.clear();
+        c2pa_cbor::to_writer(&mut assertion_cbor, &ia)
+            .map_err(|e| crate::Error::BadParam(e.to_string()))?;
+        if size.is_some() && assertion_cbor.len() != expected_len {
+            return Err(crate::Error::BadParam(format!(
+                "identity_assertion test hook changed the assertion size from {expected_len} to {len} bytes",
                 len = assertion_cbor.len()
             )));
         }
@@ -517,15 +585,24 @@ mod tests {
             roles: vec![],
         };
 
-        let DynamicAssertionContent::Cbor(unpadded) =
-            finalize_identity_assertion(signer_payload.clone(), None, Ok(vec![])).unwrap()
-        else {
+        let DynamicAssertionContent::Cbor(unpadded) = finalize_identity_assertion(
+            signer_payload.clone(),
+            None,
+            Ok(vec![]),
+            &super::BuilderTestHooks::default(),
+        )
+        .unwrap() else {
             panic!("expected CBOR content");
         };
         let unpadded_len = unpadded.len();
 
         for size in [0usize, 1, unpadded_len, unpadded_len + 14] {
-            match finalize_identity_assertion(signer_payload.clone(), Some(size), Ok(vec![])) {
+            match finalize_identity_assertion(
+                signer_payload.clone(),
+                Some(size),
+                Ok(vec![]),
+                &super::BuilderTestHooks::default(),
+            ) {
                 Err(crate::Error::BadParam(_)) => {}
                 Err(e) => panic!("expected BadParam, got {e:?}"),
                 Ok(_) => panic!("a reserve size that is too small must panic"),
