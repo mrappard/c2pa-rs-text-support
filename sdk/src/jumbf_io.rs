@@ -17,6 +17,8 @@ use std::{collections::HashMap, io::Cursor, sync::Arc};
 
 use lazy_static::lazy_static;
 
+#[cfg(feature = "unstable_blockfact")]
+use crate::asset_handlers::blockfact_io::BlockFactIO;
 #[cfg(feature = "pdf")]
 use crate::asset_handlers::pdf_io::PdfIO;
 #[cfg(feature = "unstable_plain_text")]
@@ -55,6 +57,8 @@ lazy_static! {
         Box::new(StructuredTextIO::new("")),
         #[cfg(feature = "unstable_plain_text")]
         Box::new(PlainTextIO::new("")),
+        #[cfg(feature = "unstable_blockfact")]
+        Box::new(BlockFactIO::new("")),
         Box::new(ZipIO::new("")),
     ];
 
@@ -365,6 +369,9 @@ pub mod tests {
 
         let plain_text_supported = supported.iter().any(|s| s == "txt");
         assert_eq!(plain_text_supported, cfg!(feature = "unstable_plain_text"));
+
+        let blockfact_supported = supported.iter().any(|s| s == "facti");
+        assert_eq!(blockfact_supported, cfg!(feature = "unstable_blockfact"));
 
         assert!(supported.iter().any(|s| s == "jpg"));
         assert!(supported.iter().any(|s| s == "jpeg"));

@@ -11,6 +11,8 @@
 // specific language governing permissions and limitations under
 // each license.
 
+#[cfg(feature = "unstable_blockfact")]
+pub mod blockfact_io;
 pub mod bmff_io;
 pub mod c2pa_io;
 pub mod flac_io;
