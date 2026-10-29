@@ -459,6 +459,12 @@ pub struct BoxMap {
     /// as zero for hashing, whatever the asset contains there. For example, a font's
     /// `head.checkSumAdjustment`, which changes whenever any table does.
     pub hashed_as_zero: Vec<(u64, u64)>,
+    /// The absolute `(start, length)` byte runs that make up this box, in the order they
+    /// are hashed, when it is not one contiguous region. For example, an Ogg logical
+    /// bitstream, whose pages can be interleaved with other streams' pages. Empty for a
+    /// contiguous box, which is `[range_start, range_start + range_len)`. A segmented box
+    /// is never grouped with other boxes and has no permitted exclusions.
+    pub segments: Vec<(u64, u64)>,
 }
 
 impl BoxMap {
@@ -471,6 +477,28 @@ impl BoxMap {
             range_len,
             allowed_exclusions: vec![],
             hashed_as_zero: vec![],
+            segments: vec![],
+        }
+    }
+
+    /// Makes this a segmented box made of `segments` (see [`Self::segments`]), and sets
+    /// `range_start` / `range_len` to the span from the first run to the end of the last.
+    /// A single run is stored as an ordinary contiguous box.
+    pub fn with_segments(mut self, segments: Vec<(u64, u64)>) -> Self {
+        if let (Some(&(first, _)), Some(&(last, last_len))) = (segments.first(), segments.last()) {
+            self.range_start = first;
+            self.range_len = last + last_len - first;
+        }
+        self.segments = if segments.len() > 1 { segments } else { vec![] };
+        self
+    }
+
+    /// The byte ranges this box is hashed over, in order.
+    pub(crate) fn hash_ranges(&self) -> Vec<(u64, u64)> {
+        if self.segments.is_empty() {
+            vec![(self.range_start, self.range_len)]
+        } else {
+            self.segments.clone()
         }
     }
 
