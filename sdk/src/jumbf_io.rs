@@ -17,6 +17,8 @@ use std::{collections::HashMap, io::Cursor, sync::Arc};
 
 use lazy_static::lazy_static;
 
+#[cfg(feature = "unstable_ogg")]
+use crate::asset_handlers::ogg_io::OggIO;
 #[cfg(feature = "pdf")]
 use crate::asset_handlers::pdf_io::PdfIO;
 #[cfg(feature = "unstable_plain_text")]
@@ -56,6 +58,8 @@ lazy_static! {
         Box::new(StructuredTextIO::new("")),
         #[cfg(feature = "unstable_plain_text")]
         Box::new(PlainTextIO::new("")),
+        #[cfg(feature = "unstable_ogg")]
+        Box::new(OggIO::new("")),
         Box::new(ZipIO::new("")),
     ];
 
@@ -366,6 +370,9 @@ pub mod tests {
 
         let plain_text_supported = supported.iter().any(|s| s == "txt");
         assert_eq!(plain_text_supported, cfg!(feature = "unstable_plain_text"));
+
+        let ogg_supported = supported.iter().any(|s| s == "ogg");
+        assert_eq!(ogg_supported, cfg!(feature = "unstable_ogg"));
 
         assert!(supported.iter().any(|s| s == "jpg"));
         assert!(supported.iter().any(|s| s == "jpeg"));

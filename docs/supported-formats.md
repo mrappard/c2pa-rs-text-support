@@ -39,6 +39,14 @@ The following table summarizes the supported media (asset) file formats. This in
 
 The manifest is stored in a `C2PA` font table, and the font is bound to it with a general box hash (`c2pa.hash.boxes`) in which each table is a box, as the C2PA specification describes. The table directory, `head.checkSumAdjustment` and inter-table padding are not hashed, and the SDK recomputes the font's checksums after embedding. The specification marks the `C2PA` table layout as preliminary. Font collections (`.ttc`), WOFF and WOFF2 are not supported, and a remote manifest URI in the `C2PA` table is preserved but not used for reading.
 
+## Experimental feature: Ogg
+
+The Rust library supports Ogg files, such as Ogg Vorbis, when the `unstable_ogg` feature is enabled.
+
+| Extensions    | MIME type   |
+| ------------- | ----------- |
+| `ogg`, `oga`  | `audio/ogg` |
+
 ## Experimental feature: Text formats
 
 The Rust library supports the following text formats when the `unstable_structured_text` feature is enabled.
