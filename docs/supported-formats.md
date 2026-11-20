@@ -33,6 +33,16 @@ The following table summarizes the supported media (asset) file formats. This in
 | `wav`           | `audio/wav`                                                                     |
 | `webp`          | `image/webp`                                                                    |
 
+## Experimental feature: BlockFact
+
+The Rust library supports BlockFact media files (format version 2) when the `unstable_blockfact` feature is enabled.
+
+| Extensions | MIME type                   |
+| ---------- | --------------------------- |
+| `facti`    | `image/vnd.blockfact.facti` |
+| `facta`    | `audio/vnd.blockfact.facta` |
+| `factv`    | `video/vnd.blockfact.factv` |
+
 ## Experimental feature: Text formats
 
 The Rust library supports the following text formats when the `unstable_structured_text` feature is enabled.
