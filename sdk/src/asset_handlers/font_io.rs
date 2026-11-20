@@ -450,6 +450,32 @@ impl AssetBoxHash for FontIO {
             );
         }
 
+        // Tables are zero-padded to 4-byte boundaries, so a font can end with up to three
+        // padding bytes after its last table. They go to the `C2PA` box (the table when it is
+        // last, else its placeholder), which is excluded from the hash, so the box hash does not
+        // take them for a `c2pa.after` trailer whose length changes once the table is written.
+        let tables_end = font.tables.iter().map(TableRecord::end).max().unwrap_or(0);
+        let tail = stream_len(input_stream)?.saturating_sub(tables_end);
+        if tail > 0 && tail == padding(tables_end) {
+            input_stream.seek(SeekFrom::Start(tables_end))?;
+            let mut bytes = vec![0u8; tail as usize];
+            input_stream.read_exact(&mut bytes)?;
+            let c2pa_is_last = font
+                .table(C2PA_TAG)
+                .is_none_or(|table| table.end() == tables_end);
+            if bytes.iter().all(|&b| b == 0) && c2pa_is_last {
+                if let Some(c2pa) = box_maps
+                    .iter_mut()
+                    .find(|bm| bm.names.first().is_some_and(|n| n == C2PA_BOXHASH))
+                {
+                    if c2pa.range_len == 0 {
+                        c2pa.range_start = tables_end;
+                    }
+                    c2pa.range_len += tail;
+                }
+            }
+        }
+
         Ok(box_maps)
     }
 
