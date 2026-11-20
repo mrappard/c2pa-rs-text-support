@@ -16,6 +16,7 @@ pub mod blockfact_io;
 pub mod bmff_io;
 pub mod c2pa_io;
 pub mod flac_io;
+pub mod font_io;
 pub mod gif_io;
 #[cfg(feature = "unstable_html")]
 pub mod html_io;

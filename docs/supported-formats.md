@@ -26,15 +26,21 @@ The following table summarizes the supported media (asset) file formats. This in
 | `mp4`           | `video/mp4`, `application/mp4` <br/>Fragmented MP4 (DASH) supported only for file-based operations from the Rust library. |
 | `mov`           | `video/quicktime`                                                               |
 | `onnx`          | (none registered) <br/>The manifest is stored Base64-encoded in a `c2pa:manifest` entry of the model's `metadata_props`. Models with external tensor data can't be signed, since the data hash covers only the `.onnx` file. |
+| `otf`           | `font/otf` <br/>OpenType/TrueType (SFNT) fonts; see note below.                 |
 | `parquet`       | `application/vnd.apache.parquet` <br/>The manifest is stored Base64-encoded as `c2pa:manifest` in the footer's `key_value_metadata`. Encrypted files are not supported. |
 | `pdf`           | `application/pdf`                                                               |
 | `png`           | `image/png`                                                                     |
 | `safetensors`   | (none registered) <br/>The manifest is stored Base64-encoded as `c2pa:manifest` in the JSON header's `__metadata__`. |
 | `svg`           | `image/svg+xml`                                                                 |
 | `tif`, `tiff`   | `image/tiff`                                                                    |
+| `ttf`           | `font/ttf` <br/>OpenType/TrueType (SFNT) fonts; see note below.                 |
 | `txt`           | `text/plain`                                                                    |
 | `wav`           | `audio/wav`                                                                     |
 | `webp`          | `image/webp`                                                                    |
+
+### Fonts
+
+The manifest is stored in a `C2PA` font table, and the font is bound to it with a general box hash (`c2pa.hash.boxes`) in which each table is a box, as the C2PA specification describes. The table directory, `head.checkSumAdjustment` and inter-table padding are not hashed, and the SDK recomputes the font's checksums after embedding. The specification marks the `C2PA` table layout as preliminary. Font collections (`.ttc`), WOFF and WOFF2 are not supported, and a remote manifest URI in the `C2PA` table is preserved but not used for reading.
 
 ## Experimental feature: BlockFact
 
