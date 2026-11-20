@@ -411,11 +411,28 @@ impl BoxHash {
 
         for bm in &self.boxes {
             let mut skip_c2pa = false;
+            let mut segments: Option<Vec<HashRange>> = None;
             let mut inclusion = HashRange::new(0u64, 0u64);
             let mut box_ranges: Vec<BoxRangeInfo> = Vec::with_capacity(bm.names.len());
             for name in &bm.names {
                 match source_bms.get(source_index) {
                     Some(next_source_bm) if name == &next_source_bm.names[0] => {
+                        if !next_source_bm.segments.is_empty() {
+                            // A segmented box (e.g. an Ogg logical bitstream) is hashed over
+                            // its own runs, so it can't share an entry with other boxes.
+                            if bm.names.len() != 1 {
+                                return Err(Error::HashMismatch(
+                                    "Segmented box grouped with other boxes".to_owned(),
+                                ));
+                            }
+                            segments = Some(
+                                next_source_bm
+                                    .segments
+                                    .iter()
+                                    .map(|&(start, len)| HashRange::new(start, len))
+                                    .collect(),
+                            );
+                        }
                         box_ranges.push(BoxRangeInfo {
                             start: next_source_bm.range_start,
                             len: next_source_bm.range_len,
@@ -486,9 +503,15 @@ impl BoxHash {
                 continue;
             }
 
-            let inclusions = match &bm.exclusions {
-                None => vec![inclusion],
-                Some(excl) => {
+            let inclusions = match (&bm.exclusions, segments) {
+                (None, Some(segments)) => segments,
+                // A segmented box has no permitted exclusion ranges.
+                (Some(_), Some(_)) => return Err(Error::HashMismatch(
+                    "box hash exclusion is not contained within any permitted range for its box"
+                        .to_string(),
+                )),
+                (None, None) => vec![inclusion],
+                (Some(excl), None) => {
                     let (ranges, metadata_used) =
                         split_exclusions(&box_ranges, inclusion.start(), inclusion.length(), excl)?;
                     metadata_exclusion_used |= metadata_used;
@@ -620,6 +643,14 @@ impl BoxHash {
         // §16.3.3.2), symmetrically with verification, so a signed asset with a
         // trailer is not rejected by its own hard binding.
         Self::append_c2pa_after_box(&mut source_bms, &mut *reader)?;
+
+        // The minimal form collapses consecutive boxes into one contiguous range. That
+        // doesn't fit a segmented box, nor a format whose only binding is a box hash (fonts,
+        // Ogg), where boxes can be laid out differently once the manifest is embedded, so
+        // those get an entry per box instead.
+        let minimal_form = minimal_form
+            && !bhp.requires_box_hash()
+            && source_bms.iter().all(|bm| bm.segments.is_empty());
 
         if minimal_form {
             let mut before_c2pa = BoxMap {
@@ -782,7 +813,15 @@ impl BoxHash {
                     .collect();
 
                 let inclusions = if exclusions.is_empty() {
-                    vec![HashRange::new(bm.range_start, bm.range_len)]
+                    bm.hash_ranges()
+                        .into_iter()
+                        .map(|(start, len)| HashRange::new(start, len))
+                        .collect()
+                } else if !bm.segments.is_empty() {
+                    return Err(Error::HashMismatch(
+                        "box hash exclusion is not contained within any permitted range for its box"
+                            .to_string(),
+                    ));
                 } else {
                     split_exclusions(&box_ranges, bm.range_start, bm.range_len, &exclusions)?.0
                 };
@@ -1179,6 +1218,7 @@ mod tests {
                 range_start: 0,
                 range_len: 10,
                 hashed_as_zero: vec![],
+                segments: vec![],
                 allowed_exclusions: vec![AllowedExclusion {
                     start: 0,
                     length: 10,
@@ -1225,6 +1265,7 @@ mod tests {
                 range_start: 0,
                 range_len: 10,
                 hashed_as_zero: vec![],
+                segments: vec![],
                 allowed_exclusions: vec![],
             }])
         });
@@ -1266,6 +1307,7 @@ mod tests {
                 range_start: 0,
                 range_len: 10,
                 hashed_as_zero: vec![],
+                segments: vec![],
                 allowed_exclusions: vec![AllowedExclusion {
                     start: 0,
                     length: 10,
@@ -1314,6 +1356,7 @@ mod tests {
                 range_start: 0,
                 range_len: 10,
                 hashed_as_zero: vec![],
+                segments: vec![],
                 allowed_exclusions: vec![],
             }])
         });
@@ -1352,6 +1395,7 @@ mod tests {
                 range_start: 0,
                 range_len: 10,
                 hashed_as_zero: vec![],
+                segments: vec![],
                 allowed_exclusions: vec![AllowedExclusion {
                     start: 0,
                     length: 10,
@@ -1947,6 +1991,7 @@ mod tests {
                 range_start: 0,
                 range_len: 10,
                 hashed_as_zero: vec![],
+                segments: vec![],
                 allowed_exclusions: vec![],
             }])
         });
@@ -1985,6 +2030,7 @@ mod tests {
                     range_start: 0,
                     range_len: 10,
                     hashed_as_zero: vec![],
+                    segments: vec![],
                     // Only ranges within an AssetMetadata/ManifestOrPadding
                     // range may be excluded (spec §15.12.3).
                     allowed_exclusions: vec![AllowedExclusion {
@@ -1999,6 +2045,7 @@ mod tests {
                     range_start: 10,
                     range_len: 10,
                     hashed_as_zero: vec![],
+                    segments: vec![],
                     allowed_exclusions: vec![AllowedExclusion {
                         start: 0,
                         length: 10,
@@ -2073,6 +2120,7 @@ mod tests {
                     range_start: 0,
                     range_len: 10,
                     hashed_as_zero: vec![],
+                    segments: vec![],
                     allowed_exclusions: vec![AllowedExclusion {
                         start: 0,
                         length: 10,
@@ -2085,6 +2133,7 @@ mod tests {
                     range_start: 10,
                     range_len: 5,
                     hashed_as_zero: vec![],
+                    segments: vec![],
                     allowed_exclusions: vec![AllowedExclusion {
                         start: 0,
                         length: 5,
@@ -2097,6 +2146,7 @@ mod tests {
                     range_start: 15,
                     range_len: 10,
                     hashed_as_zero: vec![],
+                    segments: vec![],
                     allowed_exclusions: vec![AllowedExclusion {
                         start: 0,
                         length: 10,

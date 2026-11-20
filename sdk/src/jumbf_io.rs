@@ -23,6 +23,8 @@ use crate::asset_handlers::blockfact_io::BlockFactIO;
 use crate::asset_handlers::html_io::HtmlIO;
 #[cfg(feature = "unstable_midi")]
 use crate::asset_handlers::midi_io::MidiIO;
+#[cfg(feature = "unstable_ogg")]
+use crate::asset_handlers::ogg_io::OggIO;
 #[cfg(feature = "pdf")]
 use crate::asset_handlers::pdf_io::PdfIO;
 #[cfg(feature = "unstable_plain_text")]
@@ -80,6 +82,8 @@ lazy_static! {
         Box::new(TtmlIO::new("")),
         #[cfg(feature = "unstable_html")]
         Box::new(HtmlIO::new("")),
+        #[cfg(feature = "unstable_ogg")]
+        Box::new(OggIO::new("")),
         Box::new(ZipIO::new("")),
     ];
 
@@ -397,6 +401,8 @@ pub mod tests {
         assert_eq!(warc_supported, cfg!(feature = "unstable_warc"));
         let ttml_supported = supported.iter().any(|s| s == "ttml");
         assert_eq!(ttml_supported, cfg!(feature = "unstable_ttml"));
+        let ogg_supported = supported.iter().any(|s| s == "ogg");
+        assert_eq!(ogg_supported, cfg!(feature = "unstable_ogg"));
 
         assert!(supported.iter().any(|s| s == "jpg"));
         assert!(supported.iter().any(|s| s == "jpeg"));

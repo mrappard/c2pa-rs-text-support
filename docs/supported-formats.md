@@ -68,6 +68,14 @@ The Rust library supports standalone TTML documents when the `unstable_ttml` fea
 | -------------- | ---------------------- |
 | `ttml`, `dfxp` | `application/ttml+xml` |
 
+## Experimental feature: Ogg
+
+The Rust library supports Ogg files, such as Ogg Vorbis, when the `unstable_ogg` feature is enabled.
+
+| Extensions    | MIME type   |
+| ------------- | ----------- |
+| `ogg`, `oga`  | `audio/ogg` |
+
 ## Experimental feature: Text formats
 
 The Rust library supports the following text formats when the `unstable_structured_text` feature is enabled.
