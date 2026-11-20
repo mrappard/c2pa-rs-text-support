@@ -19,6 +19,8 @@ use lazy_static::lazy_static;
 
 #[cfg(feature = "unstable_blockfact")]
 use crate::asset_handlers::blockfact_io::BlockFactIO;
+#[cfg(feature = "unstable_html")]
+use crate::asset_handlers::html_io::HtmlIO;
 #[cfg(feature = "pdf")]
 use crate::asset_handlers::pdf_io::PdfIO;
 #[cfg(feature = "unstable_plain_text")]
@@ -67,6 +69,8 @@ lazy_static! {
         Box::new(WarcIO::new("")),
         #[cfg(feature = "unstable_ttml")]
         Box::new(TtmlIO::new("")),
+        #[cfg(feature = "unstable_html")]
+        Box::new(HtmlIO::new("")),
         Box::new(ZipIO::new("")),
     ];
 

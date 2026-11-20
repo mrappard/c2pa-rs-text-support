@@ -71,6 +71,11 @@ unstable_warc = ["dep:flate2"]
 # usual semantic-versioning stability guarantees and may change or be removed in any release.
 # See docs/experimental-features.md.
 unstable_ttml = []
+# Native HTML asset handler (C2PA A.7 `<script type="application/c2pa">` / `<link
+# rel="c2pa-manifest">`). Experimental feature: exempt from the crate's usual semantic-versioning
+# stability guarantees and may change or be removed in any release. See
+# docs/experimental-features.md.
+unstable_html = []
 # TODO: make our async tests always use the async API so we don't need ureq + reqwest
 #       see https://github.com/contentauth/c2pa-rs/issues/1364
 default_http = ["http_reqwest", "http_ureq", "http_wasi", "http_wstd"]
