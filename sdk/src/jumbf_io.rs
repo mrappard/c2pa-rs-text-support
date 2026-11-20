@@ -36,8 +36,8 @@ use crate::asset_handlers::ttml_io::TtmlIO;
 use crate::{
     asset_handlers::{
         bmff_io::BmffIO, c2pa_io::C2paIO, flac_io::FlacIO, gif_io::GifIO, jpeg_io::JpegIO,
-        jpegxl_io::JpegXlIO, mp3_io::Mp3IO, png_io::PngIO, riff_io::RiffIO, svg_io::SvgIO,
-        tiff_io::TiffIO, zip_io::ZipIO,
+        jpegxl_io::JpegXlIO, mp3_io::Mp3IO, parquet_io::ParquetIO, png_io::PngIO, riff_io::RiffIO,
+        svg_io::SvgIO, tiff_io::TiffIO, zip_io::ZipIO,
     },
     asset_io::{AssetIO, C2paReader, C2paWriter, HandlerRegistry, ReadSeek, ReadWriteSeek},
     error::{Error, Result},
@@ -63,6 +63,7 @@ lazy_static! {
         Box::new(FlacIO::new("")),
         #[cfg(feature = "unstable_midi")]
         Box::new(MidiIO::new("")),
+        Box::new(ParquetIO::new("")),
         #[cfg(feature = "unstable_structured_text")]
         Box::new(StructuredTextIO::new("")),
         #[cfg(feature = "unstable_plain_text")]
