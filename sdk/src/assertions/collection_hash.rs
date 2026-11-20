@@ -243,17 +243,18 @@ impl CollectionHash {
         handler: &dyn AssetCollectionHash,
     ) -> Result<()> {
         for (uri, hash) in handler.member_hashes(stream, &self.alg)? {
-            let entry = UriHashedDataMap {
-                hash: Some(hash),
-                size: None,
-                dc_format: None,
-                data_types: None,
-            };
-            if self.uris.insert(PathBuf::from(&uri), entry).is_some() {
+            if self.get(&uri).is_some() {
                 return Err(Error::BadParam(format!(
                     "collection member {uri} appears more than once"
                 )));
             }
+            self.uris.push(UriHashedDataMap {
+                uri,
+                hash: Some(hash),
+                size: None,
+                dc_format: None,
+                data_types: None,
+            });
         }
         Ok(())
     }
@@ -282,8 +283,7 @@ impl CollectionHash {
         }
         for (uri, hash) in members {
             let expected = self
-                .uris
-                .get(Path::new(&uri))
+                .get(&uri)
                 .and_then(|entry| entry.hash.as_ref())
                 .ok_or_else(|| {
                     Error::HashMismatch(format!(
