@@ -25,6 +25,8 @@ use crate::asset_handlers::pdf_io::PdfIO;
 use crate::asset_handlers::plain_text_io::PlainTextIO;
 #[cfg(feature = "unstable_structured_text")]
 use crate::asset_handlers::structured_text_io::StructuredTextIO;
+#[cfg(feature = "unstable_warc")]
+use crate::asset_handlers::warc_io::WarcIO;
 use crate::{
     asset_handlers::{
         bmff_io::BmffIO, c2pa_io::C2paIO, flac_io::FlacIO, gif_io::GifIO, jpeg_io::JpegIO,
@@ -59,6 +61,8 @@ lazy_static! {
         Box::new(PlainTextIO::new("")),
         #[cfg(feature = "unstable_blockfact")]
         Box::new(BlockFactIO::new("")),
+        #[cfg(feature = "unstable_warc")]
+        Box::new(WarcIO::new("")),
         Box::new(ZipIO::new("")),
     ];
 
@@ -372,6 +376,8 @@ pub mod tests {
 
         let blockfact_supported = supported.iter().any(|s| s == "facti");
         assert_eq!(blockfact_supported, cfg!(feature = "unstable_blockfact"));
+        let warc_supported = supported.iter().any(|s| s == "warc");
+        assert_eq!(warc_supported, cfg!(feature = "unstable_warc"));
 
         assert!(supported.iter().any(|s| s == "jpg"));
         assert!(supported.iter().any(|s| s == "jpeg"));
