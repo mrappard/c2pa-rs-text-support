@@ -21,23 +21,23 @@ use lazy_static::lazy_static;
 use crate::asset_handlers::blockfact_io::BlockFactIO;
 #[cfg(feature = "unstable_html")]
 use crate::asset_handlers::html_io::HtmlIO;
-#[cfg(feature = "pdf")]
-use crate::asset_handlers::pdf_io::PdfIO;
 #[cfg(feature = "unstable_midi")]
 use crate::asset_handlers::midi_io::MidiIO;
+#[cfg(feature = "pdf")]
+use crate::asset_handlers::pdf_io::PdfIO;
 #[cfg(feature = "unstable_plain_text")]
 use crate::asset_handlers::plain_text_io::PlainTextIO;
 #[cfg(feature = "unstable_structured_text")]
 use crate::asset_handlers::structured_text_io::StructuredTextIO;
-#[cfg(feature = "unstable_warc")]
-use crate::asset_handlers::warc_io::WarcIO;
 #[cfg(feature = "unstable_ttml")]
 use crate::asset_handlers::ttml_io::TtmlIO;
+#[cfg(feature = "unstable_warc")]
+use crate::asset_handlers::warc_io::WarcIO;
 use crate::{
     asset_handlers::{
         bmff_io::BmffIO, c2pa_io::C2paIO, flac_io::FlacIO, gif_io::GifIO, jpeg_io::JpegIO,
-        jpegxl_io::JpegXlIO, mp3_io::Mp3IO, parquet_io::ParquetIO, png_io::PngIO, riff_io::RiffIO,
-        svg_io::SvgIO, tiff_io::TiffIO, zip_io::ZipIO,
+        jpegxl_io::JpegXlIO, mp3_io::Mp3IO, onnx_io::OnnxIO, parquet_io::ParquetIO, png_io::PngIO,
+        riff_io::RiffIO, svg_io::SvgIO, tiff_io::TiffIO, zip_io::ZipIO,
     },
     asset_io::{AssetIO, C2paReader, C2paWriter, HandlerRegistry, ReadSeek, ReadWriteSeek},
     error::{Error, Result},
@@ -64,6 +64,7 @@ lazy_static! {
         #[cfg(feature = "unstable_midi")]
         Box::new(MidiIO::new("")),
         Box::new(ParquetIO::new("")),
+        Box::new(OnnxIO::new("")),
         #[cfg(feature = "unstable_structured_text")]
         Box::new(StructuredTextIO::new("")),
         #[cfg(feature = "unstable_plain_text")]
