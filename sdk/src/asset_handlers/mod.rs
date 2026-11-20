@@ -31,6 +31,7 @@ pub mod parquet_io;
 pub mod plain_text_io;
 pub mod png_io;
 pub mod riff_io;
+pub mod safetensors_io;
 #[cfg(feature = "unstable_structured_text")]
 pub mod structured_text_io;
 pub mod svg_io;

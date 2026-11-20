@@ -29,6 +29,7 @@ The following table summarizes the supported media (asset) file formats. This in
 | `parquet`       | `application/vnd.apache.parquet` <br/>The manifest is stored Base64-encoded as `c2pa:manifest` in the footer's `key_value_metadata`. Encrypted files are not supported. |
 | `pdf`           | `application/pdf`                                                               |
 | `png`           | `image/png`                                                                     |
+| `safetensors`   | (none registered) <br/>The manifest is stored Base64-encoded as `c2pa:manifest` in the JSON header's `__metadata__`. |
 | `svg`           | `image/svg+xml`                                                                 |
 | `tif`, `tiff`   | `image/tiff`                                                                    |
 | `txt`           | `text/plain`                                                                    |
