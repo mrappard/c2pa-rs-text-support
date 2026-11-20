@@ -34,7 +34,7 @@ enum CommentStyle {
 }
 
 /// A.9.2 excludes `text/html` and `image/svg+xml`, which have their own embedding sections.
-/// Other XML-based formats use the structured-text method with XML comment syntax.
+/// Other XML-based formats use the structured-text method with a `c2pa` processing instruction.
 static SUPPORTED_TYPES: [&str; 33] = [
     "atom",
     "application/atom+xml",
@@ -73,7 +73,7 @@ static SUPPORTED_TYPES: [&str; 33] = [
 
 /// Each extension's MIME type. The default [`AssetIO::mime_type_map`] pairs every extension
 /// with the first MIME type in [`SUPPORTED_TYPES`], which would resolve e.g. `script.py` to
-/// `application/atom+xml` and embed an XML comment in it. `ini` has no registered MIME type
+/// `application/atom+xml` and embed an XML processing instruction in it. `ini` has no registered MIME type
 /// and stays resolved by extension.
 const EXTENSION_MIME_TYPES: [(&str, &str); 16] = [
     ("atom", "application/atom+xml"),
@@ -98,18 +98,10 @@ const PLACEHOLDER_STORE: &[u8] = b"placeholder manifest";
 
 fn comment_style(asset_type: &str) -> Option<CommentStyle> {
     Some(match asset_type.to_lowercase().as_str() {
-        "md"
-        | "markdown"
-        | "text/markdown"
-        | "rss"
-        | "application/rss+xml"
-        | "atom"
-        | "application/atom+xml"
-        | "xml"
-        | "application/xml"
-        | "text/xml"
-        | "xhtml"
-        | "application/xhtml+xml" => CommentStyle::Block("<!--", "-->"),
+        "md" | "markdown" | "text/markdown" => CommentStyle::Block("<!--", "-->"),
+        // XML forbids `--` in a comment, so XML formats carry the delimiters in a `c2pa`
+        // processing instruction (A.9).
+        t if is_xml(t) => CommentStyle::Block("<?c2pa", "?>"),
         "yaml" | "yml" | "application/yaml" | "text/yaml" | "toml" | "application/toml" | "py"
         | "text/x-python" => CommentStyle::Line("#"),
         "ini" => CommentStyle::Line(";"),
@@ -120,6 +112,21 @@ fn comment_style(asset_type: &str) -> Option<CommentStyle> {
         "vtt" | "text/vtt" => CommentStyle::Line("NOTE"),
         _ => return None,
     })
+}
+
+fn is_xml(lower_asset_type: &str) -> bool {
+    matches!(
+        lower_asset_type,
+        "rss"
+            | "application/rss+xml"
+            | "atom"
+            | "application/atom+xml"
+            | "xml"
+            | "application/xml"
+            | "text/xml"
+            | "xhtml"
+            | "application/xhtml+xml"
+    )
 }
 
 pub struct StructuredTextIO {
@@ -254,9 +261,9 @@ fn front_matter_insert_point(text: &str) -> Option<usize> {
         .then_some(after_open)
 }
 
-/// Inserts the block at the A.9 position: inside leading front matter (A.9.3), else file
-/// start, end if the first line is reserved (shebang / XML decl), or after the `WEBVTT`
-/// header.
+/// Inserts the block at the A.9 position: inside leading front matter (A.9.3), right after
+/// the XML declaration for XML formats, after the `WEBVTT` header, at the end if the first
+/// line is a shebang, else at the file start.
 fn insert_block(cleaned: &str, reference: &str, style: CommentStyle, asset_type: &str) -> String {
     let le = if cleaned.contains("\r\n") {
         "\r\n"
@@ -275,6 +282,10 @@ fn insert_block(cleaned: &str, reference: &str, style: CommentStyle, asset_type:
 
     let block_line = build_block_line(style, reference);
 
+    if is_xml(&lower) {
+        return insert_after_xml_declaration(cleaned, &block_line, le);
+    }
+
     if lower == "vtt" || lower == "text/vtt" || cleaned.starts_with("WEBVTT") {
         if let Some(nl) = cleaned.find('\n') {
             let (head, rest) = cleaned.split_at(nl + 1);
@@ -290,6 +301,41 @@ fn insert_block(cleaned: &str, reference: &str, style: CommentStyle, asset_type:
     }
 
     format!("{block_line}{le}{cleaned}")
+}
+
+/// The A.9 XML position: on its own line right after the XML declaration, else at the start
+/// of the file after any byte order mark, so that nothing precedes the declaration.
+fn insert_after_xml_declaration(cleaned: &str, block_line: &str, le: &str) -> String {
+    let bom = if cleaned.starts_with('\u{FEFF}') {
+        '\u{FEFF}'.len_utf8()
+    } else {
+        0
+    };
+    let body = &cleaned[bom..];
+    // `<?xml-stylesheet ...?>` and other `xml`-prefixed targets are not the declaration.
+    let has_declaration =
+        body.starts_with("<?xml") && body[5..].starts_with(|c: char| c.is_ascii_whitespace());
+    let Some(decl_end) = body
+        .find("?>")
+        .filter(|_| has_declaration)
+        .map(|i| bom + i + 2)
+    else {
+        return format!("{}{block_line}{le}{body}", &cleaned[..bom]);
+    };
+    let rest = &cleaned[decl_end..];
+    let at = decl_end
+        + if rest.starts_with("\r\n") {
+            2
+        } else if rest.starts_with('\n') {
+            1
+        } else {
+            0
+        };
+    if at == decl_end {
+        // The root element follows on the declaration's line.
+        return format!("{}{le}{block_line}{le}{rest}", &cleaned[..decl_end]);
+    }
+    format!("{}{block_line}{le}{}", &cleaned[..at], &cleaned[at..])
 }
 
 /// Writes `reference` into `text`. An existing block is replaced in place, which preserves its
@@ -311,6 +357,21 @@ fn write_reference(
     }
 
     let b = locate_block(text).ok_or(Error::EmbeddingError)?;
+
+    // An XML file signed with a block in any other form (such as an XML comment) gets a
+    // `c2pa` processing instruction in the XML position instead.
+    let is_pi = text[b.start..b.begin]
+        .trim_start_matches('\u{FEFF}')
+        .starts_with("<?c2pa");
+    if is_xml(&asset_type.to_lowercase()) && !is_pi {
+        return Ok(insert_block(
+            &strip_blocks(text),
+            reference,
+            style,
+            asset_type,
+        ));
+    }
+
     let bytes = text.as_bytes();
     let terminator = if b.end >= 2 && &bytes[b.end - 2..b.end] == b"\r\n" {
         "\r\n"
@@ -567,21 +628,99 @@ mod tests {
         ));
     }
 
+    /// XML forbids `--` in a comment, so the block is a `c2pa` processing instruction on its
+    /// own line right after the XML declaration (A.9).
     #[test]
-    fn xml_block_goes_after_content_when_file_has_xml_declaration() {
-        // the declaration must stay on the first line, so the block goes at the end (A.9.3.1)
-        let source = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>
-<root><a>1</a></root>
-";
-        for asset_type in ["xml", "application/xml", "text/xml"] {
-            let out = embed(asset_type, source, b"xml store");
-            assert!(out.starts_with(
-                "<?xml version=\"1.0\" encoding=\"UTF-8\"?>
-<root>"
-            ));
-            assert!(out.trim_end().ends_with("-----END C2PA MANIFEST----- -->"));
+    fn xml_block_is_a_processing_instruction_after_the_declaration() {
+        let decl = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>";
+        for asset_type in ["xml", "application/xml", "text/xml", "rss", "atom", "xhtml"] {
+            let out = embed(
+                asset_type,
+                &format!("{decl}\n<root><a>1</a></root>\n"),
+                b"xml store",
+            );
+            let (first, rest) = out.split_once('\n').unwrap();
+            assert_eq!(first, decl, "{asset_type}");
+            let (block, rest) = rest.split_once('\n').unwrap();
+            assert!(
+                block.starts_with(&format!("<?c2pa {BEGIN_DELIMITER} data:")),
+                "{block}"
+            );
+            assert!(block.ends_with(&format!("{END_DELIMITER} ?>")), "{block}");
+            assert_eq!(rest, "<root><a>1</a></root>\n");
+            assert!(!out.contains("<!--"));
             assert_eq!(read_back(asset_type, &out).unwrap(), b"xml store");
         }
+    }
+
+    #[test]
+    fn xml_block_placement_edge_cases() {
+        let pi = format!("<?c2pa {BEGIN_DELIMITER} ");
+        // no declaration: the start of the file, after any byte order mark
+        let out = embed("xml", "<root/>\n", b"store");
+        assert!(
+            out.starts_with(&pi) && out.ends_with("?>\n<root/>\n"),
+            "{out}"
+        );
+        let out = embed("xml", "\u{FEFF}<root/>\n", b"store");
+        assert!(out.starts_with(&format!("\u{FEFF}{pi}")), "{out}");
+        // a stylesheet instruction is not the declaration
+        let out = embed(
+            "xml",
+            "<?xml-stylesheet href=\"a.xsl\"?>\n<root/>\n",
+            b"store",
+        );
+        assert!(out.starts_with(&pi), "{out}");
+        // the root element on the declaration's line moves to its own line after the block
+        let out = embed("xml", "<?xml version=\"1.0\"?><root/>", b"store");
+        assert!(
+            out.starts_with(&format!("<?xml version=\"1.0\"?>\n{pi}")),
+            "{out}"
+        );
+        assert!(out.ends_with("?>\n<root/>"), "{out}");
+        // CRLF files keep CRLF
+        let out = embed("xml", "<?xml version=\"1.0\"?>\r\n<root/>\r\n", b"store");
+        assert!(
+            out.starts_with(&format!("<?xml version=\"1.0\"?>\r\n{pi}")),
+            "{out}"
+        );
+        assert!(out.ends_with("?>\r\n<root/>\r\n"), "{out}");
+        assert_eq!(read_back("xml", &out).unwrap(), b"store");
+    }
+
+    /// The processing instruction's `<?c2pa ` and ` ?>` are hashed; only the delimited bytes are
+    /// excluded.
+    #[test]
+    fn xml_exclusion_covers_only_the_delimited_bytes() {
+        let out = embed("xml", "<?xml version=\"1.0\"?>\n<root/>\n", b"store");
+        let io = StructuredTextIO::new("xml");
+        let locations = io
+            .get_object_locations(&mut Cursor::new(out.clone().into_bytes()))
+            .unwrap();
+        let cai = locations
+            .iter()
+            .find(|p| p.htype == ObjectType::C2pa)
+            .unwrap();
+        let excluded = &out[cai.offset as usize..(cai.offset + cai.length) as usize];
+        assert!(excluded.starts_with(BEGIN_DELIMITER) && excluded.ends_with(END_DELIMITER));
+        assert!(out[..cai.offset as usize].ends_with("\n<?c2pa "));
+        assert!(out[(cai.offset + cai.length) as usize..].starts_with(" ?>\n<root/>"));
+    }
+
+    /// Re-signing an XML file whose block is an XML comment, as earlier versions wrote it,
+    /// replaces it with the processing instruction after the declaration.
+    #[test]
+    fn re_signing_xml_replaces_a_comment_block_with_a_processing_instruction() {
+        let old = format!(
+            "<?xml version=\"1.0\"?>\n<root/>\n<!-- {BEGIN_DELIMITER} {URL} {END_DELIMITER} -->\n"
+        );
+        let out = write_url("xml", &old, URL);
+        assert_eq!(
+            out,
+            format!("<?xml version=\"1.0\"?>\n<?c2pa {BEGIN_DELIMITER} {URL} {END_DELIMITER} ?>\n<root/>\n")
+        );
+        // a processing instruction is then replaced in place
+        assert_eq!(write_url("xml", &out, URL), out);
     }
 
     #[test]
@@ -590,7 +729,9 @@ mod tests {
             "xml", "<root/>
 ", b"store",
         );
-        assert!(out.starts_with("<!-- -----BEGIN C2PA MANIFEST----- data:application/c2pa;base64,"));
+        assert!(
+            out.starts_with("<?c2pa -----BEGIN C2PA MANIFEST----- data:application/c2pa;base64,")
+        );
         assert_eq!(read_back("xml", &out).unwrap(), b"store");
 
         let xhtml = "<?xml version=\"1.0\"?>

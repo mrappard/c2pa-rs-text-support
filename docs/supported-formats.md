@@ -97,7 +97,7 @@ The Rust library supports the following text formats when the `unstable_structur
 | `xml`            | `application/xml`, `text/xml` |
 | `yaml`, `yml`    | `application/yaml`      |
 
-These formats hold either an embedded manifest or a remote manifest URL, but not both. To sign with a URL, set both `Builder::set_remote_url` and `Builder::set_no_embed(true)`. If the file already has a manifest block, signing replaces its reference and keeps its form. A new block in Markdown front matter is a `#` comment line, so the YAML or TOML stays parseable. The hard binding excludes only the bytes from the `BEGIN` delimiter through the `END` delimiter, so this behavior differs from C2PA 2.5 and follows the change proposed in c2pa-org/specs-core#2664.
+These formats hold either an embedded manifest or a remote manifest URL, but not both. To sign with a URL, set both `Builder::set_remote_url` and `Builder::set_no_embed(true)`. If the file already has a manifest block, signing replaces its reference and keeps its form. A new block in Markdown front matter is a `#` comment line, so the YAML or TOML stays parseable. The hard binding excludes only the bytes from the `BEGIN` delimiter through the `END` delimiter, so this behavior differs from C2PA 2.5 and follows the change proposed in c2pa-org/specs-core#2664. XML formats carry the block in a `<?c2pa ?>` processing instruction on its own line right after the XML declaration (or at the start of the file), because XML forbids `--` in a comment.
 
 ## Experimental feature: HTML
 
