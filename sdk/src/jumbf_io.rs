@@ -27,6 +27,8 @@ use crate::asset_handlers::plain_text_io::PlainTextIO;
 use crate::asset_handlers::structured_text_io::StructuredTextIO;
 #[cfg(feature = "unstable_warc")]
 use crate::asset_handlers::warc_io::WarcIO;
+#[cfg(feature = "unstable_ttml")]
+use crate::asset_handlers::ttml_io::TtmlIO;
 use crate::{
     asset_handlers::{
         bmff_io::BmffIO, c2pa_io::C2paIO, flac_io::FlacIO, gif_io::GifIO, jpeg_io::JpegIO,
@@ -63,6 +65,8 @@ lazy_static! {
         Box::new(BlockFactIO::new("")),
         #[cfg(feature = "unstable_warc")]
         Box::new(WarcIO::new("")),
+        #[cfg(feature = "unstable_ttml")]
+        Box::new(TtmlIO::new("")),
         Box::new(ZipIO::new("")),
     ];
 
@@ -378,6 +382,8 @@ pub mod tests {
         assert_eq!(blockfact_supported, cfg!(feature = "unstable_blockfact"));
         let warc_supported = supported.iter().any(|s| s == "warc");
         assert_eq!(warc_supported, cfg!(feature = "unstable_warc"));
+        let ttml_supported = supported.iter().any(|s| s == "ttml");
+        assert_eq!(ttml_supported, cfg!(feature = "unstable_ttml"));
 
         assert!(supported.iter().any(|s| s == "jpg"));
         assert!(supported.iter().any(|s| s == "jpeg"));

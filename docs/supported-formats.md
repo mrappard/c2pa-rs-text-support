@@ -51,6 +51,14 @@ The Rust library supports WARC files when the `unstable_warc` feature is enabled
 | ---------- | ------------------ |
 | `warc`     | `application/warc` |
 
+## Experimental feature: TTML
+
+The Rust library supports standalone TTML documents when the `unstable_ttml` feature is enabled.
+
+| Extensions     | MIME type              |
+| -------------- | ---------------------- |
+| `ttml`, `dfxp` | `application/ttml+xml` |
+
 ## Experimental feature: Text formats
 
 The Rust library supports the following text formats when the `unstable_structured_text` feature is enabled.

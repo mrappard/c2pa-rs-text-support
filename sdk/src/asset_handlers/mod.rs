@@ -28,9 +28,11 @@ pub mod riff_io;
 #[cfg(feature = "unstable_structured_text")]
 pub mod structured_text_io;
 pub mod svg_io;
-#[cfg(feature = "unstable_structured_text")]
+#[cfg(any(feature = "unstable_structured_text", feature = "unstable_ttml"))]
 pub(crate) mod text_common;
 pub mod tiff_io;
+#[cfg(feature = "unstable_ttml")]
+pub mod ttml_io;
 #[cfg(feature = "unstable_warc")]
 pub mod warc_io;
 pub mod zip_io;
