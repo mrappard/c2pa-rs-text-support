@@ -96,13 +96,18 @@ pub(crate) fn parse_manifest_reference(reference: &str) -> Result<ManifestRefere
 /// only a URL or a `data:` URI, and A.9.5 treats an empty one as a failure. Text that is
 /// neither means the surrounding delimiters are ordinary content (prose describing the
 /// format, say) rather than a manifest block, so handlers must leave it alone.
+///
+/// The excluded reference must also stay inside the comment that carries it, so it is limited
+/// to RFC 3986 URI characters and may not contain `*/`. `<` and `>` (and so `-->`) are not URI
+/// characters, and `*/` would end a `/* */` comment. Writers percent-encode it (see
+/// [`inert_reference`]).
 pub(crate) fn is_manifest_reference(reference: &str) -> bool {
     let reference = reference.trim();
+    if reference.is_empty() || !reference.chars().all(is_uri_char) || reference.contains("*/") {
+        return false;
+    }
     if reference.starts_with(DATA_URI_PREFIX) {
         return true;
-    }
-    if reference.is_empty() || reference.contains(char::is_whitespace) {
-        return false;
     }
     // Absolute URI: an RFC 3986 scheme followed by a non-empty remainder.
     match reference.split_once(':') {
@@ -115,6 +120,18 @@ pub(crate) fn is_manifest_reference(reference: &str) -> bool {
         }
         None => false,
     }
+}
+
+#[cfg(feature = "unstable_structured_text")]
+/// An RFC 3986 character: unreserved, reserved, or `%` for a percent-encoded octet.
+fn is_uri_char(c: char) -> bool {
+    c.is_ascii_alphanumeric() || "-._~:/?#[]@!$&'()*+,;=%".contains(c)
+}
+
+#[cfg(feature = "unstable_structured_text")]
+/// `url` with each `*/` written as `%2A/`, so it can't end a `/* */` comment it is placed in.
+pub(crate) fn inert_reference(url: &str) -> String {
+    url.replace("*/", "%2A/")
 }
 
 #[cfg(all(test, feature = "unstable_structured_text"))]

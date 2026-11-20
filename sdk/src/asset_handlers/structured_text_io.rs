@@ -432,6 +432,7 @@ impl RemoteManifestUrl for StructuredTextIO {
         remote_manifest_url: &str,
     ) -> Result<()> {
         let style = comment_style(&self.asset_type).ok_or(Error::UnsupportedType)?;
+        let remote_manifest_url = &text_common::inert_reference(remote_manifest_url);
         if !text_common::is_manifest_reference(remote_manifest_url)
             || !matches!(
                 parse_manifest_reference(remote_manifest_url)?,
@@ -693,6 +694,30 @@ mod tests {
     fn a_reference_containing_whitespace_is_not_a_block() {
         let text = format!("# {BEGIN_DELIMITER} {URL} extra {END_DELIMITER}\nbody\n");
         assert_eq!(count_blocks(&text), 0);
+    }
+
+    /// A reference that ends its comment would put unhashed content outside it, so the file
+    /// reads as having no manifest (specs-core#2664 review).
+    #[test]
+    fn a_reference_that_ends_its_comment_is_not_a_block() {
+        for line in [
+            format!("/* {BEGIN_DELIMITER} https://example.org/*/body{{color:red}}/*x {END_DELIMITER} */"),
+            format!("<!-- {BEGIN_DELIMITER} https://example.org/--><script>alert(1)</script><!--x {END_DELIMITER} -->"),
+            format!("<!-- {BEGIN_DELIMITER} data:application/c2pa;base64,AAAA--><x/> {END_DELIMITER} -->"),
+            format!("# {BEGIN_DELIMITER} https://example.org/\u{2028}x {END_DELIMITER}"),
+        ] {
+            assert_eq!(count_blocks(&format!("{line}\nbody\n")), 0, "{line}");
+        }
+    }
+
+    #[test]
+    fn writing_percent_encodes_a_comment_terminator_in_the_url() {
+        let out = write_url("css", "body {}\n", "https://example.org/a*/b.c2pa");
+        assert!(out.contains("https://example.org/a%2A/b.c2pa"), "{out}");
+        assert_eq!(
+            read_url("css", &out).as_deref(),
+            Some("https://example.org/a%2A/b.c2pa")
+        );
     }
 
     /// A `#` line inside YAML front matter must stay a `#` line. The multi-line form and the
